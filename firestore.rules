@@ -1,42 +1,162 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // Helper function to check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
+    // Keys whose *value* actually changed between the stored doc and the
+    // proposed write (unchanged fields carried along in a full-document
+    // update, e.g. RoomRepository.updateRoom, never show up here).
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // True only if at least one key changed AND every changed key is in
+    // `keys`. Plain `changedKeys().hasOnly(keys)` is vacuously true for a
+    // no-op write that changes nothing (empty set is a subset of anything),
+    // which would let an unrelated `allow` branch (e.g. the isHost one)
+    // wave through a same-value replay of a field it doesn't even list.
+    function fieldsChanged(keys) {
+      return changedKeys().size() > 0 && changedKeys().hasOnly(keys);
+    }
+
+    // True if the caller currently has a player doc in this room.
+    function isRoomMember(roomCode) {
+      return exists(/databases/$(database)/documents/rooms/$(roomCode)/players/$(request.auth.uid));
+    }
+
     // Rooms collection
     match /rooms/{roomCode} {
       // Anyone can read rooms
       allow read: if isAuthenticated();
-      
-      // Anyone can create a room
-      allow create: if isAuthenticated();
-      
-      // Only allow updates to specific fields
-      // CRITICAL: Prevent client from writing Night Pass fields
-      allow update: if isAuthenticated() 
-        && !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['nightPassExpiresAt', 'nightPassActivatedBy', 
-                   'nightPassPlatform', 'nightPassPurchaseToken', 
-                   'nightPassActivatedAt']);
-      
+
+      // Anyone can create a room, but it must be self-hosted and start
+      // with zeroed-out monetization counters (matches Room()'s defaults
+      // and RoomRepository.createRoom, which always passes hostId == the
+      // creator's own uid).
+      allow create: if isAuthenticated()
+        && request.resource.data.hostId == request.auth.uid
+        && request.resource.data.gamesPlayedToday == 0
+        && request.resource.data.adUnlocksRemaining == 0;
+
+      // Field-scoped update guard. Everything not listed here (phase,
+      // currentQuestionId/Text, currentRound, roundStartTime, playerCount,
+      // totalRounds, roundDuration, lastGameDate, createdAt, code) stays as
+      // open as it was before — this only closes the fields that were
+      // trivially abusable from an unmodified client SDK call.
+      allow update: if isAuthenticated()
+        // CRITICAL: Night Pass is only ever written server-side by the
+        // verifyNightPass Cloud Function via the Admin SDK, which bypasses
+        // these rules entirely. No client write should ever touch these.
+        && !changedKeys().hasAny([
+             'nightPassExpiresAt', 'nightPassActivatedBy',
+             'nightPassPlatform', 'nightPassPurchaseToken',
+             'nightPassActivatedAt'
+           ])
+        // hostId can only be handed off to someone who is currently a
+        // player in this room (blocks an unrelated account from seizing
+        // control of a room it was never part of). This is the exact
+        // transition RoomRepository.cleanupDisconnectedPlayers performs.
+        && (!changedKeys().hasAny(['hostId']) ||
+            exists(/databases/$(database)/documents/rooms/$(roomCode)/players/$(request.resource.data.hostId)))
+        // gamesPlayedToday: only a +1 step (incrementGamesPlayed), or a
+        // reset to 0/1 paired with a lastGameDate change (the documented
+        // daily-rollover branch in canRoomStartGame/incrementGamesPlayed).
+        // Blocks writing an arbitrary/negative value or a bare reset to 0
+        // without an accompanying date change.
+        && (!changedKeys().hasAny(['gamesPlayedToday']) ||
+            request.resource.data.gamesPlayedToday == resource.data.gamesPlayedToday + 1 ||
+            (request.resource.data.gamesPlayedToday <= 1 &&
+             changedKeys().hasAny(['lastGameDate'])))
+        // adUnlocksRemaining: only +1 (grantAdUnlock, after a verified
+        // rewarded ad) or -1 (canRoomStartGame consuming one unlock).
+        // Blocks jumping straight to an arbitrary large value.
+        && (!changedKeys().hasAny(['adUnlocksRemaining']) ||
+            request.resource.data.adUnlocksRemaining == resource.data.adUnlocksRemaining + 1 ||
+            request.resource.data.adUnlocksRemaining == resource.data.adUnlocksRemaining - 1);
+
       // Only host can delete room
-      allow delete: if isAuthenticated() 
+      allow delete: if isAuthenticated()
         && request.auth.uid == resource.data.hostId;
-      
+
       // Players subcollection
       match /players/{playerId} {
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
-        allow update: if isAuthenticated() 
-          && request.auth.uid == playerId;
-        allow delete: if isAuthenticated();
+
+        // A player can only create their own doc (matches createRoom's
+        // host player and joinRoom, both keyed by the caller's own uid),
+        // starting from the same defaults Player() uses.
+        allow create: if isAuthenticated()
+          && playerId == request.auth.uid
+          && request.resource.data.id == playerId
+          && request.resource.data.score == 0
+          && request.resource.data.currentAnswer == null
+          && request.resource.data.votedFor == null;
+
+        // 1) Submit your own answer once per round (submitAnswerTransaction).
+        allow update: if isAuthenticated()
+          && request.auth.uid == playerId
+          && fieldsChanged(['currentAnswer'])
+          && resource.data.currentAnswer == null
+          && request.resource.data.currentAnswer is string
+          && request.resource.data.currentAnswer.size() > 0;
+
+        // 2) Cast your own vote once per round, never for yourself
+        //    (submitVoteTransaction, voter's own doc).
+        allow update: if isAuthenticated()
+          && request.auth.uid == playerId
+          && fieldsChanged(['votedFor'])
+          && resource.data.votedFor == null
+          && request.resource.data.votedFor is string
+          && request.resource.data.votedFor != playerId;
+
+        // 3) Heartbeat: update your own presence (connection_service.dart).
+        allow update: if isAuthenticated()
+          && request.auth.uid == playerId
+          && fieldsChanged(['lastSeen', 'isOnline']);
+
+        // 4) Score is only ever awarded by the voter's client onto the
+        //    OTHER player's doc, always exactly +100 per vote
+        //    (submitVoteTransaction). Blocks writing an arbitrary score
+        //    (including on your own doc), and — critically — requires the
+        //    awarding caller's OWN votedFor to still be null, so the same
+        //    voter can't call this a second time for a different target
+        //    after their one legitimate vote already landed.
+        allow update: if isAuthenticated()
+          && request.auth.uid != playerId
+          && fieldsChanged(['score'])
+          && request.resource.data.score == resource.data.score + 100
+          && get(/databases/$(database)/documents/rooms/$(roomCode)/players/$(request.auth.uid)).data.votedFor == null;
+
+        // 5) Round reset (clearRoundData): only during roundResult, only
+        //    nulling currentAnswer/votedFor, only by a live room member.
+        //    Narrows the reset window so another player can't null out
+        //    your in-progress answer/vote mid-round.
+        allow update: if isAuthenticated()
+          && isRoomMember(roomCode)
+          && get(/databases/$(database)/documents/rooms/$(roomCode)).data.phase == 'roundResult'
+          && fieldsChanged(['currentAnswer', 'votedFor'])
+          && request.resource.data.currentAnswer == null
+          && request.resource.data.votedFor == null;
+
+        // 6) Disconnection bookkeeping: the cosmetic isHost badge flip
+        //    performed by cleanupDisconnectedPlayers, run by whichever
+        //    live room member happens to trigger the cleanup.
+        allow update: if isAuthenticated()
+          && isRoomMember(roomCode)
+          && fieldsChanged(['isHost']);
+
+        // Only a current member of this room can remove a player doc
+        // (cleanupDisconnectedPlayers deletes stale players; this blocks
+        // an unrelated account from deleting players in a room it was
+        // never part of).
+        allow delete: if isAuthenticated() && isRoomMember(roomCode);
       }
     }
-    
+
     // Purchases collection (only Cloud Functions can write)
     match /purchases/{purchaseToken} {
       allow read: if isAuthenticated();
@@ -47,13 +167,13 @@ service cloud.firestore {
     match /users/{userId} {
       // Users can read their own profile
       allow read: if isAuthenticated() && request.auth.uid == userId;
-      
+
       // Users can update their own profile (except restricted fields)
-      allow update: if isAuthenticated() 
+      allow update: if isAuthenticated()
         && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['totalWins', 'totalGames', 'totalVotesReceived']);
-      
+
       // Only Cloud Functions can create/delete
       allow create, delete: if false;
 
@@ -74,7 +194,7 @@ service cloud.firestore {
     match /seasons/{seasonId} {
       // Anyone can read active seasons
       allow read: if isAuthenticated();
-      
+
       // Only Cloud Functions can write
       allow write: if false;
 
