@@ -1,0 +1,607 @@
+// presentation/screens/profile_screen.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../models/achievement.dart';
+import '../../models/avatar.dart';
+import '../../providers/progression_providers.dart';
+import '../../providers/game_providers.dart';
+import '../../services/haptic_service.dart';
+import '../../analytics/analytics_service.dart';
+import 'profile_public_screen.dart';
+
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen>
+    with SingleTickerProviderStateMixin {
+  final _analytics = AnalyticsService.instance;
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _analytics.trackScreenView('ProfileScreen');
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profileAsync = ref.watch(userProfileStreamProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Perfil'),
+        centerTitle: true,
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Ver perfil público',
+            onPressed: () {
+              final userId = ref.read(userIdProvider);
+              if (userId != null) {
+                HapticService.lightImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        ProfilePublicScreen(userId: userId, isOwnProfile: true),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      backgroundColor: AppColors.background,
+      body: profileAsync.when(
+        data: (profile) {
+          if (profile == null) {
+            return const Center(child: Text('No se pudo cargar el perfil'));
+          }
+
+          return Column(
+            children: [
+              // Profile header with level and XP
+              _buildProfileHeader(profile),
+
+              // Tabs
+              TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textSecondary,
+                indicatorColor: AppColors.primary,
+                tabs: const [
+                  Tab(text: 'Avatares'),
+                  Tab(text: 'Logros'),
+                ],
+              ),
+
+              // Tab views
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildAvatarsTab(profile),
+                    _buildAchievementsTab(profile),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(child: Text('Error: $error')),
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(dynamic profile) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Selected Avatar
+          Text(
+            Avatars.getById(profile.selectedAvatar)?.emoji ?? '🤡',
+            style: const TextStyle(fontSize: 80),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // Level Badge
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary, AppColors.accent],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'Nivel ${profile.level}',
+              style: AppTypography.h3.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // XP Progress Bar
+          Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${profile.xp} XP',
+                    style: AppTypography.body1.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    'Siguiente: ${profile.xpForNextLevel} XP',
+                    style: AppTypography.body1.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: profile.levelProgress,
+                  minHeight: 12,
+                  backgroundColor: AppColors.surface,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // Stats
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildStat('Partidas', profile.totalGames.toString()),
+              _buildStat('Victorias', profile.totalWins.toString()),
+              _buildStat('Votos', profile.totalVotesReceived.toString()),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStat(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: AppTypography.h2.copyWith(
+            color: AppColors.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          label,
+          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAvatarsTab(dynamic profile) {
+    final allAvatars = Avatars.all;
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: AppSpacing.md,
+        mainAxisSpacing: AppSpacing.md,
+        childAspectRatio: 0.8,
+      ),
+      itemCount: allAvatars.length,
+      itemBuilder: (context, index) {
+        final avatar = allAvatars[index];
+        final isUnlocked = profile.hasAvatar(avatar.id);
+        final isSelected = profile.selectedAvatar == avatar.id;
+
+        return _buildAvatarCard(avatar, isUnlocked, isSelected, profile);
+      },
+    );
+  }
+
+  Widget _buildAvatarCard(
+    Avatar avatar,
+    bool isUnlocked,
+    bool isSelected,
+    dynamic profile,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        if (isUnlocked && !isSelected) {
+          _selectAvatar(avatar.id);
+        } else if (!isUnlocked) {
+          _showAvatarRequirements(avatar);
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.2)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Rarity indicator
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: Color(
+                    int.parse('0xFF${avatar.rarity.color.substring(1)}'),
+                  ),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+
+            // Avatar
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Opacity(
+                    opacity: isUnlocked ? 1.0 : 0.3,
+                    child: Text(
+                      avatar.emoji,
+                      style: const TextStyle(fontSize: 48),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    avatar.name,
+                    style: AppTypography.caption.copyWith(
+                      color: isUnlocked
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (!isUnlocked)
+                    const Icon(
+                      Icons.lock,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                ],
+              ),
+            ),
+
+            // Selected checkmark
+            if (isSelected)
+              Positioned(
+                top: 4,
+                left: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check, size: 12, color: Colors.white),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAchievementsTab(dynamic profile) {
+    final allAchievements = Achievements.all;
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: AppSpacing.md,
+        mainAxisSpacing: AppSpacing.md,
+        childAspectRatio: 1.2,
+      ),
+      itemCount: allAchievements.length,
+      itemBuilder: (context, index) {
+        final achievement = allAchievements[index];
+        final isUnlocked = profile.hasAchievement(achievement.id);
+
+        return _buildAchievementCard(achievement, isUnlocked);
+      },
+    );
+  }
+
+  Widget _buildAchievementCard(Achievement achievement, bool isUnlocked) {
+    return GestureDetector(
+      onTap: () {
+        if (!isUnlocked) {
+          _showAchievementRequirements(achievement);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: isUnlocked
+              ? AppColors.surface
+              : AppColors.surface.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isUnlocked
+                ? AppColors.accent.withValues(alpha: 0.3)
+                : Colors.transparent,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Opacity(
+              opacity: isUnlocked ? 1.0 : 0.3,
+              child: Text(
+                achievement.icon,
+                style: const TextStyle(fontSize: 40),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              achievement.name,
+              style: AppTypography.body1.copyWith(
+                fontWeight: FontWeight.bold,
+                color: isUnlocked
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              achievement.description,
+              style: AppTypography.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: 2,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '+${achievement.xpReward} XP',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            if (!isUnlocked)
+              const Padding(
+                padding: EdgeInsets.only(top: AppSpacing.xs),
+                child: Icon(
+                  Icons.lock,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectAvatar(String avatarId) async {
+    HapticService.mediumImpact();
+
+    try {
+      final userId = ref.read(userIdProvider);
+      if (userId == null) return;
+
+      final controller = ref.read(progressionControllerProvider);
+      await controller.selectAvatar(uid: userId, avatarId: avatarId);
+
+      if (mounted) {
+        HapticService.success();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Avatar seleccionado: ${Avatars.getById(avatarId)?.name ?? ''}',
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      HapticService.error();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showAvatarRequirements(Avatar avatar) {
+    HapticService.lightImpact();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(
+          avatar.name,
+          style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(avatar.emoji, style: const TextStyle(fontSize: 60)),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              avatar.name,
+              style: AppTypography.body2.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: Color(
+                  int.parse('0xFF${avatar.rarity.color.substring(1)}'),
+                ).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                avatar.rarity.displayName,
+                style: AppTypography.caption.copyWith(
+                  color: Color(
+                    int.parse('0xFF${avatar.rarity.color.substring(1)}'),
+                  ),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAchievementRequirements(Achievement achievement) {
+    HapticService.lightImpact();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(
+          achievement.name,
+          style: AppTypography.h3.copyWith(color: AppColors.textPrimary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(achievement.icon, style: const TextStyle(fontSize: 60)),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              achievement.description,
+              style: AppTypography.body1.copyWith(color: AppColors.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Recompensa: +${achievement.xpReward} XP',
+                style: AppTypography.body1.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+}
