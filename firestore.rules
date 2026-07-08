@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Rooms collection
+    match /rooms/{roomCode} {
+      // Anyone can read rooms
+      allow read: if isAuthenticated();
+      
+      // Anyone can create a room
+      allow create: if isAuthenticated();
+      
+      // Only allow updates to specific fields
+      // CRITICAL: Prevent client from writing Night Pass fields
+      allow update: if isAuthenticated() 
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['nightPassExpiresAt', 'nightPassActivatedBy', 
+                   'nightPassPlatform', 'nightPassPurchaseToken', 
+                   'nightPassActivatedAt']);
+      
+      // Only host can delete room
+      allow delete: if isAuthenticated() 
+        && request.auth.uid == resource.data.hostId;
+      
+      // Players subcollection
+      match /players/{playerId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated() 
+          && request.auth.uid == playerId;
+        allow delete: if isAuthenticated();
+      }
+    }
+    
+    // Purchases collection (only Cloud Functions can write)
+    match /purchases/{purchaseToken} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only Cloud Functions
+    }
+
+    // Users collection (for progression, titles, seasons)
+    match /users/{userId} {
+      // Users can read their own profile
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can update their own profile (except restricted fields)
+      allow update: if isAuthenticated() 
+        && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['totalWins', 'totalGames', 'totalVotesReceived']);
+      
+      // Only Cloud Functions can create/delete
+      allow create, delete: if false;
+
+      // Season rewards subcollection
+      match /seasonRewards/{seasonId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow write: if false; // Only Cloud Functions
+      }
+
+      // Season history subcollection
+      match /seasonHistory/{seasonId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow write: if false; // Only Cloud Functions
+      }
+    }
+
+    // Seasons collection
+    match /seasons/{seasonId} {
+      // Anyone can read active seasons
+      allow read: if isAuthenticated();
+      
+      // Only Cloud Functions can write
+      allow write: if false;
+
+      // Final results subcollection (archived leaderboard)
+      match /final_results/{userId} {
+        allow read: if isAuthenticated();
+        allow write: if false; // Only Cloud Functions
+      }
+    }
+
+    // Leaderboards collection
+    match /leaderboards/{leaderboardType} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only Cloud Functions
+
+      match /entries/{userId} {
+        allow read: if isAuthenticated();
+        allow write: if false; // Only Cloud Functions
+      }
+    }
+  }
+}
