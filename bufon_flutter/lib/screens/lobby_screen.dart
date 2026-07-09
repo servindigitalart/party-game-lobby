@@ -7,8 +7,15 @@ import '../models/game_phase.dart';
 import '../providers/game_providers.dart';
 import '../core/exceptions.dart';
 import '../core/game_copy.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_elevation.dart';
+import '../core/theme/app_shapes.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_theme.dart';
+import '../core/theme/app_typography.dart';
 import '../analytics/analytics_service.dart';
 import '../presentation/screens/paywall_screen.dart';
+import '../presentation/widgets/animated_primary_button.dart';
 import 'game_screen.dart';
 import 'home_screen.dart';
 
@@ -202,135 +209,162 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         final canStart = room.players.length >= 3;
         final playersNeeded = (3 - room.players.length).clamp(0, 3);
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Sala de Espera'),
-            centerTitle: true,
-          ),
-          body: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Room code
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Código de Sala',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
+        // Fase 3D: Lobby migrates to the Butter Bliss light register
+        // (Capítulo 33 — "Lobby: Butter, modo claro, lento, expectante"),
+        // scoped to this screen only via a local Theme override.
+        return Theme(
+          data: AppTheme.lightTheme,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Sala de Espera'),
+              centerTitle: true,
+            ),
+            body: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Room code — the Protagonist of this screen (Capítulo 3,
+                  // ley 4): the one thing every player needs to see/share.
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.butterTint,
+                      borderRadius: AppShapes.borderRadiusXl,
+                      border: AppShapes.hairlineBorder(AppColors.butterShade),
+                      boxShadow: AppElevation.protagonistShadow(
+                        AppColors.butterShade,
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            room.code,
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 4,
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Código de Sala',
+                          style: AppTypography.body1.copyWith(
+                            color: AppColors.inkSoft,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              room.code,
+                              style: AppTypography.tabular(AppTypography.display)
+                                  .copyWith(
+                                    color: AppColors.ink,
+                                    fontSize: 32,
+                                    letterSpacing: 4,
+                                  ),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.copy),
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: room.code));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Código copiado')),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Player list
-                Text(
-                  'Jugadores (${room.players.length}/8)',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.12),
+                            IconButton(
+                              icon: const Icon(Icons.copy),
+                              color: AppColors.ink,
+                              onPressed: () {
+                                HapticFeedback.selectionClick();
+                                Clipboard.setData(
+                                  ClipboardData(text: room.code),
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Código copiado'),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  child: Text(
-                    GameCopy.lobbyWaiting(playersNeeded),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: room.players.length,
-                    itemBuilder: (context, index) {
-                      final player = room.players[index];
-                      return Card(
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            child: Text(player.name[0].toUpperCase()),
-                          ),
-                          title: Text(player.name),
-                          trailing: player.isHost
-                              ? const Chip(label: Text('Host'))
-                              : null,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.xl),
 
-                // Start button (host only)
-                if (isHost) ...[
-                  ElevatedButton(
-                    onPressed: canStart
-                        ? () => _startGame(context, ref, room.code)
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.green,
+                  // Player list
+                  Text(
+                    'Jugadores (${room.players.length}/8)',
+                    style: AppTypography.h4.copyWith(color: AppColors.ink),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.butterTint,
+                      borderRadius: AppShapes.borderRadiusLg,
+                      border: AppShapes.hairlineBorder(AppColors.butterShade),
                     ),
                     child: Text(
-                      canStart
+                      GameCopy.lobbyWaiting(playersNeeded),
+                      textAlign: TextAlign.center,
+                      style: AppTypography.body1.copyWith(
+                        color: AppColors.ink,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: room.players.length,
+                      itemBuilder: (context, index) {
+                        final player = room.players[index];
+                        return Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              child: Text(player.name[0].toUpperCase()),
+                            ),
+                            title: Text(player.name),
+                            trailing: player.isHost
+                                ? Chip(
+                                    label: Text(
+                                      'Host',
+                                      style: AppTypography.caption.copyWith(
+                                        color: AppColors.ink,
+                                      ),
+                                    ),
+                                    backgroundColor: AppColors.butter,
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // Start button (host only)
+                  if (isHost) ...[
+                    AnimatedPrimaryButton(
+                      text: canStart
                           ? 'Empezar el desmadre'
                           : GameCopy.lobbyWaiting(playersNeeded),
-                      style: const TextStyle(fontSize: 18),
+                      onPressed: canStart
+                          ? () => _startGame(context, ref, room.code)
+                          : null,
+                      backgroundColor: AppColors.butter,
+                      textColor: AppColors.ink,
+                      disabledBackgroundColor: AppColors.paperLine,
+                      disabledForegroundColor: AppColors.inkSoft,
                     ),
-                  ),
-                ] else ...[
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(8),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.butterTint,
+                        borderRadius: AppShapes.borderRadiusLg,
+                        border: AppShapes.hairlineBorder(
+                          AppColors.butterShade,
+                        ),
+                      ),
+                      child: Text(
+                        'El host decide cuándo empieza el caos.',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.body1.copyWith(
+                          color: AppColors.ink,
+                        ),
+                      ),
                     ),
-                    child: const Text(
-                      'El host decide cuándo empieza el caos.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         );

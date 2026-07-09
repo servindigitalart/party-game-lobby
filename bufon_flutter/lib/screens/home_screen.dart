@@ -1,10 +1,17 @@
 // screens/home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_providers.dart';
 import '../analytics/analytics_service.dart';
 import '../core/exceptions.dart';
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
+import '../core/theme/app_theme.dart';
+import '../core/theme/app_typography.dart';
+import '../presentation/widgets/animated_primary_button.dart';
 import '../presentation/widgets/season_countdown_banner.dart';
+import '../services/sound_service.dart';
 import 'lobby_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -143,75 +150,81 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Season Countdown Banner at top
-              const SeasonCountdownBanner(),
-              const SizedBox(height: 24),
-              const Text(
-                'BUFÓN',
-                style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '¿Quién es el más chistoso?',
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Tu nombre',
-                  border: OutlineInputBorder(),
+    // Fase 3D: Home migrates to the Butter Bliss light register (Capítulo
+    // 30 — "la vida social alrededor del juego"). Scoped to this screen's
+    // subtree with a local Theme override rather than touching main.dart,
+    // so no other screen is affected.
+    return Theme(
+      data: AppTheme.lightTheme,
+      child: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Season Countdown Banner at top
+                const SeasonCountdownBanner(),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'BUFÓN',
+                  style: AppTypography.display.copyWith(color: AppColors.ink),
+                  textAlign: TextAlign.center,
                 ),
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _createRoom,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  '¿Quién es el más chistoso?',
+                  style: AppTypography.body1.copyWith(
+                    color: AppColors.inkSoft,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Crear Sala', style: TextStyle(fontSize: 18)),
-              ),
-              const SizedBox(height: 32),
-              const Divider(),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _codeController,
-                decoration: const InputDecoration(
-                  labelText: 'Código de sala',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: AppSpacing.xxl),
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Tu nombre'),
+                  enabled: !_isLoading,
                 ),
-                textCapitalization: TextCapitalization.characters,
-                enabled: !_isLoading,
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: _isLoading ? null : _joinRoom,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                const SizedBox(height: AppSpacing.lg),
+                AnimatedPrimaryButton(
+                  text: 'Crear Sala',
+                  onPressed: _isLoading ? null : _createRoom,
+                  isLoading: _isLoading,
+                  backgroundColor: AppColors.butter,
+                  textColor: AppColors.ink,
+                  disabledBackgroundColor: AppColors.paperLine,
+                  disabledForegroundColor: AppColors.inkSoft,
                 ),
-                child: const Text(
-                  'Unirse a Sala',
-                  style: TextStyle(fontSize: 18),
+                const SizedBox(height: AppSpacing.xl),
+                const Divider(),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _codeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Código de sala',
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                  enabled: !_isLoading,
                 ),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.md),
+                OutlinedButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          // AnimatedPrimaryButton triggers this same
+                          // haptic+sound pair internally on tap-down; this
+                          // button has no built-in feedback, so it's added
+                          // explicitly here to match (Capítulo 18/19 — every
+                          // main button gets haptic + sound).
+                          HapticFeedback.lightImpact();
+                          SoundService.tap();
+                          _joinRoom();
+                        },
+                  child: const Text('Unirse a Sala'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

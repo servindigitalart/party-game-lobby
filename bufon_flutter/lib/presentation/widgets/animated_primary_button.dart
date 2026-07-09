@@ -15,6 +15,19 @@ class AnimatedPrimaryButton extends StatefulWidget {
   final IconData? icon;
   final Color? backgroundColor;
   final Color? textColor;
+
+  /// Disabled-state background color. Defaults to the legacy
+  /// `AppColors.surfaceDark` so the three pre-existing consumers
+  /// (voting/game/final_winner screens) keep their exact current look.
+  /// Pass an explicit value on a migrated (light-mode) screen, where the
+  /// legacy dark surface would look like a stray dark box.
+  final Color? disabledBackgroundColor;
+
+  /// Disabled-state label color. Defaults to the legacy
+  /// `AppColors.textSecondary` for the same reason as
+  /// [disabledBackgroundColor].
+  final Color? disabledForegroundColor;
+
   final double? width;
   final EdgeInsets? padding;
 
@@ -26,6 +39,8 @@ class AnimatedPrimaryButton extends StatefulWidget {
     this.icon,
     this.backgroundColor,
     this.textColor,
+    this.disabledBackgroundColor,
+    this.disabledForegroundColor,
     this.width,
     this.padding,
   });
@@ -127,7 +142,9 @@ class _AnimatedPrimaryButtonState extends State<AnimatedPrimaryButton>
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                color: isDisabled ? AppColors.surfaceDark : null,
+                color: isDisabled
+                    ? (widget.disabledBackgroundColor ?? AppColors.surfaceDark)
+                    : null,
                 borderRadius: AppShapes.borderRadiusMd,
                 boxShadow: isDisabled || _isPressed
                     ? AppElevation.ambient
@@ -163,7 +180,8 @@ class _AnimatedPrimaryButtonState extends State<AnimatedPrimaryButton>
                       widget.text,
                       style: AppTypography.button.copyWith(
                         color: isDisabled
-                            ? AppColors.textSecondary
+                            ? (widget.disabledForegroundColor ??
+                                  AppColors.textSecondary)
                             : (widget.textColor ?? Colors.white),
                       ),
                     ),
