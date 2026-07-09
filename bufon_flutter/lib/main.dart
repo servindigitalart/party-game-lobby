@@ -58,7 +58,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'BUFÓN',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      // Fase 3A: AppTheme.darkTheme now means the new Butter Bliss dark
+      // theme (unused until screens migrate, see BUFON_DESIGN_SYSTEM.md
+      // Capítulo 35). The app keeps running on the untouched legacy theme
+      // here until then.
+      theme: AppTheme.legacyTheme,
       home: const HomeScreen(),
     );
   }

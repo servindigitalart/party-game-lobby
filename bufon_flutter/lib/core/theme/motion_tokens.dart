@@ -1,0 +1,120 @@
+/// BUFÓN Motion tokens — implements BUFON_DESIGN_SYSTEM.md v1.1, Capítulos
+/// 16 (Motion language) y 17 (Animation timing), y el capítulo `BRAND
+/// PHYSICS`.
+///
+/// This file is infrastructure only — it defines the *values* that Motion
+/// language names (Press, Pulse, Arrive, Reveal, Swap, Settle) resolve to.
+/// No widget in this phase is rewired to use them yet (Fase 3B+ does that);
+/// existing widgets keep their own inline `Duration`/`Curves` values
+/// unchanged so nothing visibly changes in this phase. New motion code
+/// should never write a raw `Duration(milliseconds: ...)` or reach for
+/// `Curves.easeInOut` directly — it should reference one of these instead.
+library;
+
+import 'package:flutter/animation.dart';
+
+/// Named durations. Values match what's already hand-coded across
+/// `animated_primary_button.dart`, `game_card.dart`, `timer_widget.dart`,
+/// `page_transitions.dart` and `round_result_screen.dart` — this doesn't
+/// invent new numbers, it gives the numbers that already exist a name so
+/// the next widget picks from a list instead of guessing.
+class MotionDurations {
+  MotionDurations._();
+
+  // Named motion vocabulary (Capítulo 16)
+  static const Duration press = Duration(milliseconds: 120);
+  static const Duration pulse = Duration(milliseconds: 500);
+  static const Duration arrive = Duration(milliseconds: 250);
+  static const Duration swap = Duration(milliseconds: 250);
+  static const Duration settle = Duration(milliseconds: 250);
+  static const Duration revealStage = Duration(milliseconds: 800);
+  static const Duration celebratory = Duration(milliseconds: 1600);
+
+  // Tier bounds (Capítulo 17) — for validating that a new animation falls
+  // within a documented tier rather than inventing an arbitrary number.
+  static const Duration microMin = Duration(milliseconds: 100);
+  static const Duration microMax = Duration(milliseconds: 150);
+  static const Duration standardMin = Duration(milliseconds: 200);
+  static const Duration standardMax = Duration(milliseconds: 300);
+  static const Duration dramaticMin = Duration(milliseconds: 600);
+  static const Duration dramaticMax = Duration(milliseconds: 900);
+  static const Duration celebratoryMin = Duration(milliseconds: 1200);
+  static const Duration celebratoryMax = Duration(milliseconds: 2000);
+}
+
+/// Named curves. `compress`/`release` are the two curves `BRAND PHYSICS`
+/// asks for: fast-in when something is touched (loading the spring),
+/// slower-with-overshoot when it's released (the spring letting go).
+class MotionCurves {
+  MotionCurves._();
+
+  /// Touching an element — compress fast into tension.
+  static const Curve compress = Curves.easeIn;
+
+  /// Releasing a confirmed action, or an element arriving already "sprung" —
+  /// overshoots slightly past its resting value before settling.
+  static const Curve release = Curves.easeOutBack;
+
+  /// An element calling attention to itself without user interaction
+  /// (Pulse) — symmetric, since nothing is being "loaded" or "released".
+  static const Curve pulse = Curves.easeInOut;
+
+  /// A value/text swap, or a container settling after a state change.
+  static const Curve settle = Curves.easeInOut;
+}
+
+/// Scale factors. Two distinct press values are kept instead of unified
+/// into one, because the two components that already use them
+/// (`AnimatedPrimaryButton` at 0.95, `GameCard` at 0.97) were tuned
+/// separately and unifying them now would be a silent behavior change to
+/// widgets this phase must not touch.
+class MotionScale {
+  MotionScale._();
+
+  static const double pressStrong = 0.95; // botones
+  static const double pressSubtle = 0.97; // tarjetas
+  static const double pulseSelect = 1.03; // GameCard al seleccionar
+  static const double pulseUrgent = 1.10; // TimerWidget en peligro
+  static const double celebrationOvershoot = 1.15; // el resorte más grande, solo Ganador
+  static const double arriveFrom = 0.88; // punto de partida de un Arrive
+}
+
+/// Named `SpringDescription` presets for widgets that want a real physics
+/// simulation (`SpringSimulation`) instead of a `Tween`+`Curve` — useful for
+/// gesture-driven interactions (e.g. a draggable card) where the animation
+/// needs to react to velocity, which curves can't express. Unused until a
+/// future widget opts in.
+class MotionSprings {
+  MotionSprings._();
+
+  /// Compressing under touch — stiff and fast, minimal bounce.
+  static const SpringDescription press = SpringDescription(
+    mass: 1,
+    stiffness: 500,
+    damping: 26,
+  );
+
+  /// Releasing after a confirmed action — looser, allows visible overshoot.
+  static const SpringDescription release = SpringDescription(
+    mass: 1,
+    stiffness: 180,
+    damping: 12,
+  );
+}
+
+/// Standalone physical constants from `BRAND PHYSICS` that aren't a
+/// duration, curve, scale factor or spring on their own, but govern how
+/// those are combined.
+class MotionPhysics {
+  MotionPhysics._();
+
+  /// Idle "breathing" amplitude for a Protagonist-layer element at rest
+  /// (scale oscillates between 1.0 and 1.0 + this value). Ambient-layer
+  /// elements never breathe.
+  static const double breathingAmplitude = 0.008;
+  static const Duration breathingPeriod = Duration(seconds: 4);
+
+  /// How far past 1.0 a confirmed action is allowed to overshoot before
+  /// settling, as a ratio — used together with [MotionCurves.release].
+  static const double overshootRatio = 1.05;
+}

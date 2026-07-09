@@ -5,6 +5,13 @@
 class AppSpacing {
   AppSpacing._();
 
+  /// Standard border thickness (Capítulo 7/11). Was hardcoded as `1` or `2`
+  /// inconsistently across widgets — now a single source of truth.
+  static const double hairline = 1;
+
+  /// Micro separation inside small badges/chips, where `xs` (4) is too much.
+  static const double micro = 2;
+
   static const double xs = 4;
   static const double sm = 8;
   static const double md = 16;
