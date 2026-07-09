@@ -42,14 +42,26 @@ class _GameCardState extends State<GameCard>
       duration: MotionDurations.pressCard,
       vsync: this,
     );
+    // BRAND PHYSICS "Compresión y Resorte" (see BUFON_DESIGN_SYSTEM.md):
+    // the tactile press feedback compresses fast and releases with a small
+    // overshoot, asymmetric on purpose.
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: MotionScale.pressSubtle,
-    ).animate(CurvedAnimation(parent: _controller, curve: MotionCurves.settle));
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: MotionCurves.compress,
+        reverseCurve: MotionCurves.release,
+      ),
+    );
+    // The selection-confirm pulse is driven by didUpdateWidget calling
+    // forward() then reverse() back-to-back, not by direct touch — it
+    // keeps the symmetric Pulse curve (Capítulo 16), not compress/release.
     _pulseAnimation = Tween<double>(
       begin: 1.0,
       end: MotionScale.pulseSelect,
-    ).animate(CurvedAnimation(parent: _controller, curve: MotionCurves.settle));
+    ).animate(CurvedAnimation(parent: _controller, curve: MotionCurves.pulse));
   }
 
   @override

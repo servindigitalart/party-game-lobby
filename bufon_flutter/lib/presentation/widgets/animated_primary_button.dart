@@ -47,10 +47,20 @@ class _AnimatedPrimaryButtonState extends State<AnimatedPrimaryButton>
       duration: MotionDurations.pressButton,
       vsync: this,
     );
+    // BRAND PHYSICS "Compresión y Resorte": compress fast into the touch
+    // (forward, on tap-down), release with a small overshoot back to rest
+    // (reverse, on tap-up/cancel) — asymmetric on purpose, see Capítulo
+    // BRAND PHYSICS in BUFON_DESIGN_SYSTEM.md.
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: MotionScale.pressStrong,
-    ).animate(CurvedAnimation(parent: _controller, curve: MotionCurves.settle));
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: MotionCurves.compress,
+        reverseCurve: MotionCurves.release,
+      ),
+    );
   }
 
   @override
