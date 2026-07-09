@@ -2,7 +2,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_shapes.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/motion_tokens.dart';
 import '../../services/sound_service.dart';
 
 class TimerWidget extends StatefulWidget {
@@ -31,11 +33,11 @@ class _TimerWidgetState extends State<TimerWidget>
   void initState() {
     super.initState();
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 500),
+      duration: MotionDurations.pulse,
       vsync: this,
     );
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    _pulseAnimation = Tween<double>(begin: 1.0, end: MotionScale.pulseUrgent).animate(
+      CurvedAnimation(parent: _pulseController, curve: MotionCurves.pulse),
     );
   }
 
@@ -92,10 +94,9 @@ class _TimerWidgetState extends State<TimerWidget>
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: _getTimerColor().withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _getTimerColor().withValues(alpha: 0.3),
-                width: 2,
+              borderRadius: AppShapes.borderRadiusMd,
+              border: AppShapes.focusBorder(
+                _getTimerColor().withValues(alpha: 0.3),
               ),
             ),
             child: Row(
@@ -128,7 +129,7 @@ class _TimerWidgetState extends State<TimerWidget>
                 // Time display
                 Text(
                   '${widget.remainingSeconds}s',
-                  style: AppTypography.h3.copyWith(
+                  style: AppTypography.tabular(AppTypography.h3).copyWith(
                     color: _getTimerColor(),
                     fontWeight: FontWeight.bold,
                   ),
@@ -136,7 +137,7 @@ class _TimerWidgetState extends State<TimerWidget>
                 const SizedBox(width: 16),
                 Flexible(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
+                    duration: MotionDurations.swap,
                     child: Text(
                       urgencyCopy,
                       key: ValueKey(urgencyCopy),

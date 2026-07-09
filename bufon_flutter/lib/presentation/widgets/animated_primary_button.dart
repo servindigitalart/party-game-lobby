@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_elevation.dart';
+import '../../core/theme/app_shapes.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/motion_tokens.dart';
 import '../../services/sound_service.dart';
 
 class AnimatedPrimaryButton extends StatefulWidget {
@@ -41,13 +44,13 @@ class _AnimatedPrimaryButtonState extends State<AnimatedPrimaryButton>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 100),
+      duration: MotionDurations.pressButton,
       vsync: this,
     );
     _scaleAnimation = Tween<double>(
       begin: 1.0,
-      end: 0.95,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+      end: MotionScale.pressStrong,
+    ).animate(CurvedAnimation(parent: _controller, curve: MotionCurves.settle));
   }
 
   @override
@@ -94,7 +97,7 @@ class _AnimatedPrimaryButtonState extends State<AnimatedPrimaryButton>
           return Transform.scale(
             scale: _scaleAnimation.value,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+              duration: MotionDurations.settleButton,
               width: widget.width,
               padding:
                   widget.padding ??
@@ -115,17 +118,12 @@ class _AnimatedPrimaryButtonState extends State<AnimatedPrimaryButton>
                         end: Alignment.bottomRight,
                       ),
                 color: isDisabled ? AppColors.surfaceDark : null,
-                borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
+                borderRadius: AppShapes.borderRadiusMd,
                 boxShadow: isDisabled || _isPressed
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: (widget.backgroundColor ?? AppColors.primary)
-                              .withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                    ? AppElevation.ambient
+                    : AppElevation.protagonistShadow(
+                        widget.backgroundColor ?? AppColors.primary,
+                      ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,

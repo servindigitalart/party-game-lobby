@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_elevation.dart';
+import '../../core/theme/app_shapes.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/motion_tokens.dart';
 
 class GameCard extends StatefulWidget {
   final String text;
@@ -36,17 +39,17 @@ class _GameCardState extends State<GameCard>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 150),
+      duration: MotionDurations.pressCard,
       vsync: this,
     );
     _scaleAnimation = Tween<double>(
       begin: 1.0,
-      end: 0.97,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+      end: MotionScale.pressSubtle,
+    ).animate(CurvedAnimation(parent: _controller, curve: MotionCurves.settle));
     _pulseAnimation = Tween<double>(
       begin: 1.0,
-      end: 1.03,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+      end: MotionScale.pulseSelect,
+    ).animate(CurvedAnimation(parent: _controller, curve: MotionCurves.settle));
   }
 
   @override
@@ -97,8 +100,8 @@ class _GameCardState extends State<GameCard>
                 ? _pulseAnimation.value
                 : _scaleAnimation.value,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
+              duration: MotionDurations.settleCard,
+              curve: MotionCurves.settle,
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 gradient: widget.isSelected
@@ -117,23 +120,17 @@ class _GameCardState extends State<GameCard>
                     : (widget.isDisabled
                           ? AppColors.surfaceDark
                           : AppColors.surface),
-                borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-                border: Border.all(
-                  color: widget.isSelected
-                      ? (widget.selectedColor ?? AppColors.success)
-                      : AppColors.border,
-                  width: widget.isSelected ? 2 : 1,
-                ),
+                borderRadius: AppShapes.borderRadiusLg,
+                border: widget.isSelected
+                    ? AppShapes.focusBorder(
+                        widget.selectedColor ?? AppColors.success,
+                      )
+                    : AppShapes.hairlineBorder(AppColors.border),
                 boxShadow: widget.isSelected
-                    ? [
-                        BoxShadow(
-                          color: (widget.selectedColor ?? AppColors.success)
-                              .withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ]
-                    : null,
+                    ? AppElevation.protagonistShadow(
+                        widget.selectedColor ?? AppColors.success,
+                      )
+                    : AppElevation.ambient,
               ),
               child: Row(
                 children: [

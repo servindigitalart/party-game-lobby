@@ -34,15 +34,24 @@ class AppElevation {
   static const List<BoxShadow> ambient = <BoxShadow>[];
 
   /// Protagonist layer: a soft shadow tinted with the element's own color,
-  /// never a generic grey. `blurRadius`/`offset` match the spec in
-  /// Capítulo 8; `opacity` defaults to 0.3, the value already used by
-  /// `AnimatedPrimaryButton`.
-  static List<BoxShadow> protagonistShadow(Color color, {double opacity = 0.3}) {
+  /// never a generic grey. Defaults corrected in Fase 3B to match the
+  /// values actually already shipping in `AnimatedPrimaryButton` and
+  /// `GameCard` (blurRadius 12, offset (0, 4), 30% opacity) — Fase 3A had
+  /// written 16/(0, 6) from the doc's rounded spec before the exact
+  /// existing numbers were checked against real code. Preserving the real
+  /// numbers here means both widgets can adopt this helper with zero
+  /// visual change.
+  static List<BoxShadow> protagonistShadow(
+    Color color, {
+    double opacity = 0.3,
+    double blurRadius = 12,
+    Offset offset = const Offset(0, 4),
+  }) {
     return [
       BoxShadow(
         color: color.withValues(alpha: opacity),
-        blurRadius: 16,
-        offset: const Offset(0, 6),
+        blurRadius: blurRadius,
+        offset: offset,
       ),
     ];
   }

@@ -21,7 +21,13 @@ import 'package:flutter/animation.dart';
 class MotionDurations {
   MotionDurations._();
 
-  // Named motion vocabulary (Capítulo 16)
+  // Named motion vocabulary (Capítulo 16). `press`/`settle` below are tier
+  // defaults for components with no precedent to match. Fase 3B found that
+  // the two existing components using each ended up hand-tuned to slightly
+  // different concrete values (100ms vs. 150ms for press, 200ms vs. 300ms
+  // for settle) — both still land inside the same tier (Capítulo 17), so
+  // rather than force one number on both and change either widget's feel,
+  // each keeps its own exact constant below.
   static const Duration press = Duration(milliseconds: 120);
   static const Duration pulse = Duration(milliseconds: 500);
   static const Duration arrive = Duration(milliseconds: 250);
@@ -29,6 +35,13 @@ class MotionDurations {
   static const Duration settle = Duration(milliseconds: 250);
   static const Duration revealStage = Duration(milliseconds: 800);
   static const Duration celebratory = Duration(milliseconds: 1600);
+
+  // Exact per-component values (Fase 3B migration — do not round these
+  // together, see note above).
+  static const Duration pressButton = Duration(milliseconds: 100); // AnimatedPrimaryButton
+  static const Duration pressCard = Duration(milliseconds: 150); // GameCard (press + confirm pulse share one controller)
+  static const Duration settleButton = Duration(milliseconds: 200); // AnimatedPrimaryButton's AnimatedContainer
+  static const Duration settleCard = Duration(milliseconds: 300); // GameCard's AnimatedContainer
 
   // Tier bounds (Capítulo 17) — for validating that a new animation falls
   // within a documented tier rather than inventing an arbitrary number.

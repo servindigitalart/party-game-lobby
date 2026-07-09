@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_shapes.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 
@@ -23,8 +24,8 @@ class RoundIndicator extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
-        border: Border.all(color: AppColors.border),
+        borderRadius: AppShapes.borderRadiusMd,
+        border: AppShapes.hairlineBorder(AppColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -84,6 +85,11 @@ class GameProgressBar extends StatelessWidget {
                   color: isCompleted || isCurrent
                       ? AppColors.primary
                       : AppColors.surfaceDark,
+                  // Intentionally not AppShapes: this radius is derived
+                  // from the segment's own height (6/2 = 3 for a full
+                  // stadium cap on a bar this thin), not a design-token
+                  // choice — the smallest AppShapes step (radiusXs = 8)
+                  // would be larger than the segment itself and clip oddly.
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
