@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "252719014233",
+    "project_id": "funpartygame18",
+    "storage_bucket": "funpartygame18.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:252719014233:android:fd9dd7f39fd958e781ec48",
+        "android_client_info": {
+          "package_name": "com.bufon.bufon_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLtDr9g60jzToFERvp8IByB-L3OypgWgU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

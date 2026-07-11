@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'analytics/analytics_service.dart';
 import 'core/theme/app_theme.dart';
+import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
@@ -28,15 +29,7 @@ void main() async {
 
   // Initialize Firebase
   await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: 'AIzaSyDOfzM0SsG8i3WSkbydigwZtDsHhwFXodk',
-      authDomain: 'funpartygame18.firebaseapp.com',
-      projectId: 'funpartygame18',
-      storageBucket: 'funpartygame18.firebasestorage.app',
-      messagingSenderId: '252719014233',
-      appId: '1:252719014233:web:467db7942406be9581ec48',
-      measurementId: 'G-3CPS02W1VS',
-    ),
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   // Initialize Mobile Ads SDK
