@@ -160,70 +160,85 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Season Countdown Banner at top
-                const SeasonCountdownBanner(),
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  'BUFÓN',
-                  style: AppTypography.display.copyWith(color: AppColors.ink),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  '¿Quién es el más chistoso?',
-                  style: AppTypography.body1.copyWith(
-                    color: AppColors.inkSoft,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Season Countdown Banner at top
+                        const SeasonCountdownBanner(),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'BUFÓN',
+                          style: AppTypography.display.copyWith(
+                            color: AppColors.ink,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          '¿Quién es el más chistoso?',
+                          style: AppTypography.body1.copyWith(
+                            color: AppColors.inkSoft,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.xxl),
+                        TextField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Tu nombre',
+                          ),
+                          enabled: !_isLoading,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        AnimatedPrimaryButton(
+                          text: 'Crear Sala',
+                          onPressed: _isLoading ? null : _createRoom,
+                          isLoading: _isLoading,
+                          backgroundColor: AppColors.butter,
+                          textColor: AppColors.ink,
+                          disabledBackgroundColor: AppColors.paperLine,
+                          disabledForegroundColor: AppColors.inkSoft,
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        const Divider(),
+                        const SizedBox(height: AppSpacing.md),
+                        TextField(
+                          controller: _codeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Código de sala',
+                          ),
+                          textCapitalization: TextCapitalization.characters,
+                          enabled: !_isLoading,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        OutlinedButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                                  // AnimatedPrimaryButton triggers this same
+                                  // haptic+sound pair internally on tap-down; this
+                                  // button has no built-in feedback, so it's added
+                                  // explicitly here to match (Capítulo 18/19 — every
+                                  // main button gets haptic + sound).
+                                  HapticFeedback.lightImpact();
+                                  SoundService.tap();
+                                  _joinRoom();
+                                },
+                          child: const Text('Unirse a Sala'),
+                        ),
+                      ],
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Tu nombre'),
-                  enabled: !_isLoading,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                AnimatedPrimaryButton(
-                  text: 'Crear Sala',
-                  onPressed: _isLoading ? null : _createRoom,
-                  isLoading: _isLoading,
-                  backgroundColor: AppColors.butter,
-                  textColor: AppColors.ink,
-                  disabledBackgroundColor: AppColors.paperLine,
-                  disabledForegroundColor: AppColors.inkSoft,
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                const Divider(),
-                const SizedBox(height: AppSpacing.md),
-                TextField(
-                  controller: _codeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Código de sala',
-                  ),
-                  textCapitalization: TextCapitalization.characters,
-                  enabled: !_isLoading,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                OutlinedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () {
-                          // AnimatedPrimaryButton triggers this same
-                          // haptic+sound pair internally on tap-down; this
-                          // button has no built-in feedback, so it's added
-                          // explicitly here to match (Capítulo 18/19 — every
-                          // main button gets haptic + sound).
-                          HapticFeedback.lightImpact();
-                          SoundService.tap();
-                          _joinRoom();
-                        },
-                  child: const Text('Unirse a Sala'),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ),

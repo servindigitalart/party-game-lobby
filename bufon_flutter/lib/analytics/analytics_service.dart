@@ -385,7 +385,7 @@ class AnalyticsService {
       AnalyticsEvents.sessionStarted,
       parameters: {
         AnalyticsParameters.timeOfDay: timeOfDay,
-        AnalyticsParameters.isFirstSession: isFirstSession,
+        AnalyticsParameters.isFirstSession: isFirstSession ? 1 : 0,
       },
     );
 
