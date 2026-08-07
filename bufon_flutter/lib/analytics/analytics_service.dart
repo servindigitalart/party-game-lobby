@@ -3,9 +3,8 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/crash/crash_reporter.dart';
 import '../core/logging/app_logger.dart';
 import '../core/logging/log_category.dart';
 import 'analytics_events.dart';
@@ -26,7 +25,6 @@ class AnalyticsService {
   static AnalyticsService get instance => _instance;
 
   FirebaseAnalytics? _analytics;
-  FirebaseCrashlytics? _crashlytics;
   SharedPreferences? _prefs;
 
   // Session tracking
@@ -43,18 +41,15 @@ class AnalyticsService {
 
     try {
       _analytics = FirebaseAnalytics.instance;
-      _crashlytics = FirebaseCrashlytics.instance;
       _prefs = await SharedPreferences.getInstance();
 
       // Enable analytics collection
       await _analytics?.setAnalyticsCollectionEnabled(true);
 
-      // Configure Crashlytics
-      FlutterError.onError = _crashlytics?.recordFlutterFatalError;
-      PlatformDispatcher.instance.onError = (error, stack) {
-        _crashlytics?.recordError(error, stack, fatal: true);
-        return true;
-      };
+      // Crash reporting and the global error handlers belong to
+      // CrashReporter (docs/engineering/CRASHLYTICS.md — "Only
+      // CrashReporter owns Crashlytics"). This service no longer touches
+      // Crashlytics or FlutterError.onError.
 
       _isInitialized = true;
 
@@ -75,7 +70,7 @@ class AnalyticsService {
   Future<void> setUserId(String userId) async {
     if (!_isInitialized) return;
     await _analytics?.setUserId(id: userId);
-    await _crashlytics?.setUserIdentifier(userId);
+    CrashReporter.instance.setUser(userId);
   }
 
   Future<void> setUserProperty(String name, String value) async {
@@ -444,11 +439,12 @@ class AnalyticsService {
       },
     );
 
-    // Also log to Crashlytics if non-recoverable
-    if (!isRecoverable && stackTrace != null) {
-      await _crashlytics?.recordError(
+    // Also report non-recoverable failures as a crash.
+    if (!isRecoverable) {
+      CrashReporter.instance.recordNonFatal(
         Exception(errorType),
-        stackTrace,
+        stackTrace: stackTrace,
+        category: AppLogCategory.gameplay,
         reason: 'Gameplay error in $errorPhase',
       );
     }

@@ -344,7 +344,12 @@ Telemetry is passive.
 
 # Crashlytics
 
-Crashlytics should receive:
+`CrashReporter` (`lib/core/crash/`) is the single entry point for every error.
+
+It talks to a `CrashBackend`; `FirebaseCrashlyticsBackend` is the first
+implementation and the only file importing `firebase_crashlytics`.
+
+Crash reporting should receive:
 
 Unhandled exceptions
 
@@ -354,7 +359,12 @@ Important custom keys
 
 Important breadcrumbs
 
+Custom keys come from AppLogger's context providers and breadcrumbs from
+telemetry events, so features contribute both without calling CrashReporter.
+
 Never send personal information.
+
+See docs/engineering/CRASHLYTICS.md.
 
 ---
 

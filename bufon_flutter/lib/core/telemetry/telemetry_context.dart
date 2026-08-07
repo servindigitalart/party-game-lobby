@@ -60,8 +60,6 @@ class TelemetryContext {
 
   dynamic operator [](String key) => _values[key];
 
-  bool get isEmpty => _values.isEmpty;
-
   /// Returns a copy with [values] applied. A `null` value removes the key,
   /// so callers can clear a field with the same call they set it with.
   TelemetryContext merge(Map<String, dynamic> values) {

@@ -22,6 +22,8 @@ enum AppLogCategory {
   purchases,
   monetization,
   ads,
+  ui,
+  unknown,
 }
 
 extension AppLogCategoryLabel on AppLogCategory {
@@ -62,6 +64,10 @@ extension AppLogCategoryLabel on AppLogCategory {
         return 'Monetization';
       case AppLogCategory.ads:
         return 'Ads';
+      case AppLogCategory.ui:
+        return 'UI';
+      case AppLogCategory.unknown:
+        return 'Unknown';
     }
   }
 }

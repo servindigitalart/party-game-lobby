@@ -102,6 +102,14 @@ class AppLogger {
     }
   }
 
+  /// Snapshot of every attached provider's context, merged in registration
+  /// order — the same map that would be attached to a log entry right now.
+  ///
+  /// This is how CrashReporter enriches a report without knowing that
+  /// GameTelemetryService (or a future Authentication or DeviceInfo
+  /// provider) exists.
+  Map<String, dynamic> get currentContext => _collectContext();
+
   /// Very detailed information. Development only; dropped in release
   /// builds.
   void trace(
@@ -198,6 +206,31 @@ class AppLogger {
   }) {
     _log(
       AppLogLevel.fatal,
+      category,
+      message,
+      context: context,
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+
+  /// Logs at a level chosen at runtime.
+  ///
+  /// The named level methods above are the ergonomic API for call sites
+  /// that know their level statically. This one exists for the systems that
+  /// carry a level as data — GameTelemetryService dispatching a
+  /// [AppLogEntry]'s severity, CrashReporter mirroring a report — so they
+  /// do not each reimplement a switch over all seven levels.
+  void log(
+    AppLogLevel level,
+    AppLogCategory category,
+    String message, {
+    Map<String, dynamic>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    _log(
+      level,
       category,
       message,
       context: context,

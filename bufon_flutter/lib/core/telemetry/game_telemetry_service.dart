@@ -255,48 +255,14 @@ class GameTelemetryService {
       TelemetryEvent.entryKey: event,
     };
 
-    final logger = AppLogger.instance;
-
-    switch (event.severity) {
-      case AppLogLevel.trace:
-        logger.trace(event.category, event.name, context: entryContext);
-      case AppLogLevel.debug:
-        logger.debug(event.category, event.name, context: entryContext);
-      case AppLogLevel.info:
-        logger.info(event.category, event.name, context: entryContext);
-      case AppLogLevel.warning:
-        logger.warning(
-          event.category,
-          event.name,
-          context: entryContext,
-          error: event.error,
-          stackTrace: event.stackTrace,
-        );
-      case AppLogLevel.error:
-        logger.error(
-          event.category,
-          event.name,
-          context: entryContext,
-          error: event.error,
-          stackTrace: event.stackTrace,
-        );
-      case AppLogLevel.critical:
-        logger.critical(
-          event.category,
-          event.name,
-          context: entryContext,
-          error: event.error,
-          stackTrace: event.stackTrace,
-        );
-      case AppLogLevel.fatal:
-        logger.fatal(
-          event.category,
-          event.name,
-          context: entryContext,
-          error: event.error,
-          stackTrace: event.stackTrace,
-        );
-    }
+    AppLogger.instance.log(
+      event.severity,
+      event.category,
+      event.name,
+      context: entryContext,
+      error: event.error,
+      stackTrace: event.stackTrace,
+    );
   }
 
   Map<String, dynamic> _resolveDeviceContext() {

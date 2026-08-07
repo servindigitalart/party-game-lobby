@@ -3,6 +3,17 @@
 import 'log_category.dart';
 import 'log_level.dart';
 
+/// Whether [key] is an internal context key.
+///
+/// Keys prefixed with `_` carry structured objects or routing markers meant
+/// for a specific destination — the typed `TelemetryEvent`, CrashReporter's
+/// origin marker — rather than data to display or export. Destinations that
+/// render or forward context must skip them.
+///
+/// Defined here so the convention has exactly one owner; previously the
+/// console formatter and the crash reporter each spelled it out.
+bool isInternalContextKey(String key) => key.startsWith('_');
+
 /// A single structured log record.
 ///
 /// This is the payload every [AppLogDestination] receives from [AppLogger].
@@ -31,4 +42,11 @@ class AppLogEntry {
   final DateTime timestamp;
   final Object? error;
   final StackTrace? stackTrace;
+
+  /// [context] without internal keys — what a destination should render,
+  /// export or turn into custom keys.
+  Map<String, dynamic> get publicContext => {
+    for (final entry in context.entries)
+      if (!isInternalContextKey(entry.key)) entry.key: entry.value,
+  };
 }
