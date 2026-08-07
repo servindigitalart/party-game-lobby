@@ -1,11 +1,12 @@
 // domain/controllers/progression_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import '../../models/user_profile.dart';
 import '../../models/achievement.dart';
 import '../../models/avatar.dart';
 import '../../analytics/analytics_service.dart';
 import '../../core/exceptions.dart';
+import '../../core/logging/app_logger.dart';
+import '../../core/logging/log_category.dart';
 import 'leaderboard_controller.dart';
 import 'title_controller.dart';
 
@@ -461,7 +462,12 @@ class ProgressionController {
           newTitles.addAll(titles);
         } catch (e) {
           // Don't fail progression if title evaluation fails
-          debugPrint('Title evaluation failed: $e');
+          AppLogger.instance.warning(
+            AppLogCategory.player,
+            'Title evaluation failed',
+            context: {'uid': uid},
+            error: e,
+          );
         }
       }
 

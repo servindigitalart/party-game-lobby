@@ -1,10 +1,11 @@
 // services/iap_service.dart
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../analytics/analytics_service.dart';
+import '../core/logging/app_logger.dart';
+import '../core/logging/log_category.dart';
 
 /// Service for managing In-App Purchases (Night Pass)
 ///
@@ -38,7 +39,10 @@ class IAPService {
       _isAvailable = await _iap.isAvailable();
 
       if (!_isAvailable) {
-        debugPrint('[IAPService] In-App Purchase not available');
+        AppLogger.instance.warning(
+          AppLogCategory.purchases,
+          '[IAPService] In-App Purchase not available',
+        );
         return;
       }
 
@@ -47,50 +51,84 @@ class IAPService {
       final response = await _iap.queryProductDetails(productIds);
 
       if (response.error != null) {
-        debugPrint('[IAPService] Error querying products: ${response.error}');
+        AppLogger.instance.error(
+          AppLogCategory.purchases,
+          '[IAPService] Error querying products',
+          error: response.error,
+        );
         return;
       }
 
       _products = response.productDetails;
-      debugPrint('[IAPService] Found ${_products.length} products');
+      AppLogger.instance.info(
+        AppLogCategory.purchases,
+        '[IAPService] Found ${_products.length} products',
+      );
 
       // Listen to purchase updates
       _subscription = _iap.purchaseStream.listen(
         _onPurchaseUpdate,
         onError: (error) {
-          debugPrint('[IAPService] Purchase stream error: $error');
+          AppLogger.instance.error(
+            AppLogCategory.purchases,
+            '[IAPService] Purchase stream error',
+            error: error,
+          );
         },
       );
 
-      debugPrint('[IAPService] Initialized successfully');
+      AppLogger.instance.info(
+        AppLogCategory.purchases,
+        '[IAPService] Initialized successfully',
+      );
     } catch (e) {
-      debugPrint('[IAPService] Failed to initialize: $e');
+      AppLogger.instance.error(
+        AppLogCategory.purchases,
+        '[IAPService] Failed to initialize',
+        error: e,
+      );
     }
   }
 
   /// Handle purchase updates
   Future<void> _onPurchaseUpdate(List<PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
-      debugPrint('[IAPService] Purchase update: ${purchase.status}');
+      AppLogger.instance.info(
+        AppLogCategory.purchases,
+        '[IAPService] Purchase update: ${purchase.status}',
+      );
 
       if (purchase.status == PurchaseStatus.pending) {
         // Payment pending
-        debugPrint('[IAPService] Purchase pending');
+        AppLogger.instance.info(
+          AppLogCategory.purchases,
+          '[IAPService] Purchase pending',
+        );
       } else if (purchase.status == PurchaseStatus.purchased ||
           purchase.status == PurchaseStatus.restored) {
         // Verify with backend before completing
         final verified = await _verifyPurchase(purchase);
 
         if (verified) {
-          debugPrint('[IAPService] Purchase verified successfully');
+          AppLogger.instance.info(
+            AppLogCategory.purchases,
+            '[IAPService] Purchase verified successfully',
+          );
         } else {
-          debugPrint('[IAPService] Purchase verification failed');
+          AppLogger.instance.warning(
+            AppLogCategory.purchases,
+            '[IAPService] Purchase verification failed',
+          );
         }
 
         // Complete the purchase
         await _iap.completePurchase(purchase);
       } else if (purchase.status == PurchaseStatus.error) {
-        debugPrint('[IAPService] Purchase error: ${purchase.error}');
+        AppLogger.instance.error(
+          AppLogCategory.purchases,
+          '[IAPService] Purchase error',
+          error: purchase.error,
+        );
       }
     }
   }
@@ -102,7 +140,11 @@ class IAPService {
       // The actual verification happens in buyNightPass
       return true;
     } catch (e) {
-      debugPrint('[IAPService] Verification error: $e');
+      AppLogger.instance.error(
+        AppLogCategory.purchases,
+        '[IAPService] Verification error',
+        error: e,
+      );
       return false;
     }
   }
@@ -112,7 +154,10 @@ class IAPService {
   /// Returns true if purchase was successful and verified
   Future<bool> buyNightPass(String roomCode, String userId) async {
     if (!_isAvailable) {
-      debugPrint('[IAPService] IAP not available');
+      AppLogger.instance.warning(
+        AppLogCategory.purchases,
+        '[IAPService] IAP not available',
+      );
       return false;
     }
 
@@ -138,11 +183,18 @@ class IAPService {
       );
 
       // Initiate purchase
-      debugPrint('[IAPService] Initiating Night Pass purchase');
+      AppLogger.instance.info(
+        AppLogCategory.purchases,
+        '[IAPService] Initiating Night Pass purchase',
+        context: {'roomCode': roomCode},
+      );
       final success = await _iap.buyNonConsumable(purchaseParam: purchaseParam);
 
       if (!success) {
-        debugPrint('[IAPService] Failed to initiate purchase');
+        AppLogger.instance.warning(
+          AppLogCategory.purchases,
+          '[IAPService] Failed to initiate purchase',
+        );
         return false;
       }
 
@@ -187,7 +239,11 @@ class IAPService {
       final verified = data['success'] as bool? ?? false;
 
       if (verified) {
-        debugPrint('[IAPService] Night Pass activated for room $roomCode');
+        AppLogger.instance.info(
+          AppLogCategory.purchases,
+          '[IAPService] Night Pass activated for room $roomCode',
+          context: {'roomCode': roomCode},
+        );
 
         // Analytics: Track successful purchase
         await _analytics.logNightPassPurchased(
@@ -204,11 +260,18 @@ class IAPService {
         return true;
       } else {
         final error = data['error'] as String? ?? 'Unknown error';
-        debugPrint('[IAPService] Verification failed: $error');
+        AppLogger.instance.error(
+          AppLogCategory.purchases,
+          '[IAPService] Verification failed: $error',
+        );
         return false;
       }
     } catch (e) {
-      debugPrint('[IAPService] Purchase failed: $e');
+      AppLogger.instance.error(
+        AppLogCategory.purchases,
+        '[IAPService] Purchase failed',
+        error: e,
+      );
       return false;
     }
   }
@@ -240,15 +303,22 @@ class IAPService {
 
     try {
       await _iap.restorePurchases();
-      debugPrint('[IAPService] Purchases restored');
+      AppLogger.instance.info(
+        AppLogCategory.purchases,
+        '[IAPService] Purchases restored',
+      );
     } catch (e) {
-      debugPrint('[IAPService] Failed to restore purchases: $e');
+      AppLogger.instance.error(
+        AppLogCategory.purchases,
+        '[IAPService] Failed to restore purchases',
+        error: e,
+      );
     }
   }
 
   /// Dispose service
   void dispose() {
     _subscription?.cancel();
-    debugPrint('[IAPService] Disposed');
+    AppLogger.instance.info(AppLogCategory.purchases, '[IAPService] Disposed');
   }
 }

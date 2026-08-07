@@ -2,6 +2,8 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/widgets.dart';
+import '../core/logging/app_logger.dart';
+import '../core/logging/log_category.dart';
 
 /// Service responsible for maintaining player connection heartbeat
 ///
@@ -70,7 +72,12 @@ class ConnectionService {
       });
     } catch (e) {
       // Silently fail - heartbeat will retry in 10 seconds
-      debugPrint('Heartbeat failed: $e');
+      AppLogger.instance.warning(
+        AppLogCategory.network,
+        'Heartbeat failed',
+        context: {'roomCode': _currentRoomCode, 'playerId': _currentPlayerId},
+        error: e,
+      );
     }
   }
 
@@ -118,7 +125,12 @@ class ConnectionService {
 
       await playerRef.update({'isOnline': false});
     } catch (e) {
-      debugPrint('Failed to mark offline: $e');
+      AppLogger.instance.warning(
+        AppLogCategory.network,
+        'Failed to mark offline',
+        context: {'roomCode': _currentRoomCode, 'playerId': _currentPlayerId},
+        error: e,
+      );
     }
   }
 

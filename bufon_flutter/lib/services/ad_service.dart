@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../analytics/analytics_service.dart';
+import '../core/logging/app_logger.dart';
+import '../core/logging/log_category.dart';
 
 /// Service for managing AdMob rewarded ads
 ///
@@ -52,19 +54,29 @@ class AdService {
   Future<void> initialize() async {
     try {
       await MobileAds.instance.initialize();
-      debugPrint('[AdService] Mobile Ads SDK initialized');
+      AppLogger.instance.info(
+        AppLogCategory.ads,
+        '[AdService] Mobile Ads SDK initialized',
+      );
 
       // Preload first ad
       await loadRewardedAd();
     } catch (e) {
-      debugPrint('[AdService] Failed to initialize: $e');
+      AppLogger.instance.error(
+        AppLogCategory.ads,
+        '[AdService] Failed to initialize',
+        error: e,
+      );
     }
   }
 
   /// Load a rewarded ad with exponential backoff retry
   Future<void> loadRewardedAd() async {
     if (_isLoading || _isAdReady) {
-      debugPrint('[AdService] Already loading or ad ready, skipping load');
+      AppLogger.instance.debug(
+        AppLogCategory.ads,
+        '[AdService] Already loading or ad ready, skipping load',
+      );
       return;
     }
 
@@ -77,7 +89,10 @@ class AdService {
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) {
-            debugPrint('[AdService] Rewarded ad loaded successfully');
+            AppLogger.instance.info(
+              AppLogCategory.ads,
+              '[AdService] Rewarded ad loaded successfully',
+            );
             _rewardedAd = ad;
             _isAdReady = true;
             _isLoading = false;
@@ -85,26 +100,37 @@ class AdService {
             _setupAdCallbacks();
           },
           onAdFailedToLoad: (error) {
-            debugPrint('[AdService] Failed to load ad: ${error.message}');
+            AppLogger.instance.warning(
+              AppLogCategory.ads,
+              '[AdService] Failed to load ad: ${error.message}',
+            );
             _isLoading = false;
             _isAdReady = false;
 
             // Retry with exponential backoff
             if (_loadAttempts < _maxLoadAttempts) {
               final delay = Duration(seconds: _loadAttempts * 2);
-              debugPrint(
+              AppLogger.instance.info(
+                AppLogCategory.ads,
                 '[AdService] Retrying in ${delay.inSeconds}s (attempt $_loadAttempts/$_maxLoadAttempts)',
               );
               Future.delayed(delay, loadRewardedAd);
             } else {
-              debugPrint('[AdService] Max retry attempts reached');
+              AppLogger.instance.error(
+                AppLogCategory.ads,
+                '[AdService] Max retry attempts reached',
+              );
               _loadAttempts = 0;
             }
           },
         ),
       );
     } catch (e) {
-      debugPrint('[AdService] Exception loading ad: $e');
+      AppLogger.instance.error(
+        AppLogCategory.ads,
+        '[AdService] Exception loading ad',
+        error: e,
+      );
       _isLoading = false;
       _isAdReady = false;
     }
@@ -114,11 +140,17 @@ class AdService {
   void _setupAdCallbacks() {
     _rewardedAd?.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (ad) {
-        debugPrint('[AdService] Ad showed full screen content');
+        AppLogger.instance.info(
+          AppLogCategory.ads,
+          '[AdService] Ad showed full screen content',
+        );
         _isShowing = true;
       },
       onAdDismissedFullScreenContent: (ad) {
-        debugPrint('[AdService] Ad dismissed full screen content');
+        AppLogger.instance.info(
+          AppLogCategory.ads,
+          '[AdService] Ad dismissed full screen content',
+        );
         _isShowing = false;
         _isAdReady = false;
         ad.dispose();
@@ -128,7 +160,10 @@ class AdService {
         loadRewardedAd();
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
-        debugPrint('[AdService] Ad failed to show: ${error.message}');
+        AppLogger.instance.warning(
+          AppLogCategory.ads,
+          '[AdService] Ad failed to show: ${error.message}',
+        );
         _isShowing = false;
         _isAdReady = false;
         ad.dispose();
@@ -145,7 +180,10 @@ class AdService {
   /// Returns true if user earned the reward, false otherwise
   Future<bool> showRewardedAd({String? roomCode}) async {
     if (!_isAdReady || _rewardedAd == null || _isShowing) {
-      debugPrint('[AdService] Ad not ready to show');
+      AppLogger.instance.warning(
+        AppLogCategory.ads,
+        '[AdService] Ad not ready to show',
+      );
       return false;
     }
 
@@ -164,7 +202,8 @@ class AdService {
       // Show the ad with reward callback
       await _rewardedAd!.show(
         onUserEarnedReward: (ad, reward) {
-          debugPrint(
+          AppLogger.instance.info(
+            AppLogCategory.ads,
             '[AdService] User earned reward: ${reward.amount} ${reward.type}',
           );
           rewardEarned = true;
@@ -196,7 +235,11 @@ class AdService {
 
       return rewardEarned;
     } catch (e) {
-      debugPrint('[AdService] Exception showing ad: $e');
+      AppLogger.instance.error(
+        AppLogCategory.ads,
+        '[AdService] Exception showing ad',
+        error: e,
+      );
 
       // Analytics: Track failure
       if (roomCode != null) {
@@ -217,6 +260,6 @@ class AdService {
     _isAdReady = false;
     _isLoading = false;
     _isShowing = false;
-    debugPrint('[AdService] Disposed');
+    AppLogger.instance.info(AppLogCategory.ads, '[AdService] Disposed');
   }
 }

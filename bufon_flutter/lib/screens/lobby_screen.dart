@@ -14,6 +14,8 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/app_typography.dart';
 import '../analytics/analytics_service.dart';
+import '../core/logging/app_logger.dart';
+import '../core/logging/log_category.dart';
 import '../presentation/screens/paywall_screen.dart';
 import '../presentation/widgets/animated_primary_button.dart';
 import 'game_screen.dart';
@@ -64,7 +66,12 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       }
     } catch (e) {
       // Silently fail - cleanup will retry in 30 seconds
-      debugPrint('Cleanup failed: $e');
+      AppLogger.instance.warning(
+        AppLogCategory.room,
+        'Cleanup failed',
+        context: {'roomCode': roomCode},
+        error: e,
+      );
     }
   }
 

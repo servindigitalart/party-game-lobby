@@ -1,9 +1,10 @@
 // domain/controllers/season_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import '../../models/season.dart';
 import '../../models/leaderboard_entry.dart';
 import '../../analytics/analytics_service.dart';
+import '../../core/logging/app_logger.dart';
+import '../../core/logging/log_category.dart';
 
 class SeasonController {
   final FirebaseFirestore _firestore;
@@ -25,7 +26,11 @@ class SeasonController {
 
       return Season.fromFirestore(querySnapshot.docs.first);
     } catch (e) {
-      debugPrint('Error getting current season: $e');
+      AppLogger.instance.error(
+        AppLogCategory.firestore,
+        'Error getting current season',
+        error: e,
+      );
       return null;
     }
   }
@@ -48,7 +53,11 @@ class SeasonController {
       final season = Season.fromFirestore(seasonDoc);
 
       if (!season.isActive) {
-        debugPrint('Season already finalized');
+        AppLogger.instance.info(
+          AppLogCategory.firestore,
+          'Season already finalized',
+          context: {'seasonId': seasonId},
+        );
         return;
       }
 
@@ -61,7 +70,11 @@ class SeasonController {
         final freshSeason = Season.fromFirestore(freshDoc);
 
         if (!freshSeason.isActive) {
-          debugPrint('Season already finalized in transaction');
+          AppLogger.instance.info(
+            AppLogCategory.firestore,
+            'Season already finalized in transaction',
+            context: {'seasonId': seasonId},
+          );
           return;
         }
 
@@ -78,9 +91,18 @@ class SeasonController {
         seasonName: season.name,
       );
 
-      debugPrint('Season $seasonId finalized successfully');
+      AppLogger.instance.info(
+        AppLogCategory.firestore,
+        'Season finalized successfully',
+        context: {'seasonId': seasonId},
+      );
     } catch (e) {
-      debugPrint('Error finalizing season: $e');
+      AppLogger.instance.error(
+        AppLogCategory.firestore,
+        'Error finalizing season',
+        context: {'seasonId': seasonId},
+        error: e,
+      );
       rethrow;
     }
   }
@@ -164,9 +186,18 @@ class SeasonController {
       }
 
       await batch.commit();
-      debugPrint('Rewarded ${leaderboardSnapshot.docs.length} top players');
+      AppLogger.instance.info(
+        AppLogCategory.firestore,
+        'Rewarded ${leaderboardSnapshot.docs.length} top players',
+        context: {'seasonId': seasonId},
+      );
     } catch (e) {
-      debugPrint('Error rewarding top players: $e');
+      AppLogger.instance.error(
+        AppLogCategory.firestore,
+        'Error rewarding top players',
+        context: {'seasonId': seasonId},
+        error: e,
+      );
       rethrow;
     }
   }
@@ -197,9 +228,18 @@ class SeasonController {
       }
 
       await batch.commit();
-      debugPrint('Archived ${leaderboardSnapshot.docs.length} results');
+      AppLogger.instance.info(
+        AppLogCategory.firestore,
+        'Archived ${leaderboardSnapshot.docs.length} results',
+        context: {'seasonId': seasonId},
+      );
     } catch (e) {
-      debugPrint('Error archiving season results: $e');
+      AppLogger.instance.error(
+        AppLogCategory.firestore,
+        'Error archiving season results',
+        context: {'seasonId': seasonId},
+        error: e,
+      );
       rethrow;
     }
   }
@@ -238,7 +278,11 @@ class SeasonController {
 
       return season;
     } catch (e) {
-      debugPrint('Error creating next season: $e');
+      AppLogger.instance.error(
+        AppLogCategory.firestore,
+        'Error creating next season',
+        error: e,
+      );
       rethrow;
     }
   }
@@ -257,7 +301,12 @@ class SeasonController {
           .map((doc) => SeasonHistory.fromFirestore(doc))
           .toList();
     } catch (e) {
-      debugPrint('Error getting user season history: $e');
+      AppLogger.instance.error(
+        AppLogCategory.firestore,
+        'Error getting user season history',
+        context: {'userId': userId},
+        error: e,
+      );
       return [];
     }
   }
@@ -275,7 +324,12 @@ class SeasonController {
 
       return historyDoc.data()?['rank'] as int?;
     } catch (e) {
-      debugPrint('Error getting user season rank: $e');
+      AppLogger.instance.error(
+        AppLogCategory.firestore,
+        'Error getting user season rank',
+        context: {'userId': userId, 'seasonId': seasonId},
+        error: e,
+      );
       return null;
     }
   }
@@ -321,7 +375,12 @@ class SeasonController {
         );
       }).toList();
     } catch (e) {
-      debugPrint('Error getting season leaderboard: $e');
+      AppLogger.instance.error(
+        AppLogCategory.firestore,
+        'Error getting season leaderboard',
+        context: {'seasonId': seasonId},
+        error: e,
+      );
       return [];
     }
   }

@@ -4,12 +4,17 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'analytics/analytics_service.dart';
+import 'core/logging/app_logger.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Structured logging must be ready before any other service starts,
+  // so every subsequent init step can be logged.
+  AppLogger.instance.init();
 
   // Set system UI overlay style for dark theme
   SystemChrome.setSystemUIOverlayStyle(

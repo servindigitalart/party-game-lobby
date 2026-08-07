@@ -6,6 +6,8 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/logging/app_logger.dart';
+import '../core/logging/log_category.dart';
 import 'analytics_events.dart';
 
 /// Analytics service for BUFÓN
@@ -56,13 +58,16 @@ class AnalyticsService {
 
       _isInitialized = true;
 
-      if (kDebugMode) {
-        print('[Analytics] Service initialized');
-      }
+      AppLogger.instance.info(
+        AppLogCategory.analytics,
+        'Service initialized',
+      );
     } catch (e) {
-      if (kDebugMode) {
-        print('[Analytics] Failed to initialize: $e');
-      }
+      AppLogger.instance.error(
+        AppLogCategory.analytics,
+        'Failed to initialize',
+        error: e,
+      );
     }
   }
 
@@ -487,13 +492,17 @@ class AnalyticsService {
     try {
       await _analytics?.logEvent(name: name, parameters: parameters);
 
-      if (kDebugMode) {
-        print('[Analytics] Event: $name ${parameters ?? {}}');
-      }
+      AppLogger.instance.debug(
+        AppLogCategory.analytics,
+        'Event: $name',
+        context: parameters,
+      );
     } catch (e) {
-      if (kDebugMode) {
-        print('[Analytics] Failed to log event $name: $e');
-      }
+      AppLogger.instance.error(
+        AppLogCategory.analytics,
+        'Failed to log event $name',
+        error: e,
+      );
     }
   }
 
