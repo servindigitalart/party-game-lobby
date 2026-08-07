@@ -14,10 +14,10 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/app_typography.dart';
 import '../analytics/analytics_service.dart';
-import '../core/logging/app_logger.dart';
 import '../core/logging/log_category.dart';
 import '../core/telemetry/game_telemetry_service.dart';
-import '../core/telemetry/telemetry_context.dart';
+import '../core/logging/log_level.dart';
+import '../core/telemetry/telemetry_event.dart';
 import '../presentation/screens/paywall_screen.dart';
 import '../presentation/widgets/animated_primary_button.dart';
 import 'game_screen.dart';
@@ -68,13 +68,17 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       if (room == null && mounted) {
         _navigateToHomeWithMessage('La sala se cerró por desconexión');
       }
-    } catch (e) {
-      // Silently fail - cleanup will retry in 30 seconds
-      AppLogger.instance.warning(
+    } catch (e, stackTrace) {
+      // Cleanup retries in 30 seconds, so one failure is not a crash — but
+      // a run of them means the lobby is silently drifting out of sync,
+      // which is exactly what the breadcrumb trail needs to show.
+      _telemetry.fail(
         AppLogCategory.room,
-        'Cleanup failed',
-        context: {'roomCode': roomCode},
+        'lobby_cleanup_failed',
         error: e,
+        stackTrace: stackTrace,
+        severity: AppLogLevel.warning,
+        status: TelemetryStatus.retried,
       );
     }
   }
@@ -139,19 +143,9 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         questionText: question.text,
       );
 
-      _telemetry.updateContext({
-        TelemetryKeys.playerCount: room.players.length,
-        TelemetryKeys.round: 1,
-        TelemetryKeys.gameState: 'playing',
-      });
-
-      // Room code / player count already travel in Session Context, so the
-      // payload only carries what is specific to this match.
-      _telemetry.track(
-        AppLogCategory.gameplay,
-        'match_started',
-        payload: {'total_rounds': room.totalRounds},
-      );
+      // `match_started` is emitted by RoomRepository.startFirstRound, which
+      // owns the transition, and Session Context is refreshed from the room
+      // snapshot — neither belongs in the UI layer.
 
       // Track game started
       await _analytics.logGameStarted(
@@ -275,8 +269,10 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                           children: [
                             Text(
                               room.code,
-                              style: AppTypography.tabular(AppTypography.display)
-                                  .copyWith(
+                              style:
+                                  AppTypography.tabular(
+                                    AppTypography.display,
+                                  ).copyWith(
                                     color: AppColors.ink,
                                     fontSize: 32,
                                     letterSpacing: 4,
@@ -320,9 +316,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                     child: Text(
                       GameCopy.lobbyWaiting(playersNeeded),
                       textAlign: TextAlign.center,
-                      style: AppTypography.body1.copyWith(
-                        color: AppColors.ink,
-                      ),
+                      style: AppTypography.body1.copyWith(color: AppColors.ink),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -375,9 +369,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.butterTint,
                         borderRadius: AppShapes.borderRadiusLg,
-                        border: AppShapes.hairlineBorder(
-                          AppColors.butterShade,
-                        ),
+                        border: AppShapes.hairlineBorder(AppColors.butterShade),
                       ),
                       child: Text(
                         'El host decide cuándo empieza el caos.',

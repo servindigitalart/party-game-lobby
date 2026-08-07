@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_phase.dart';
 import '../models/player.dart';
 import '../providers/game_providers.dart';
+import '../core/telemetry/game_telemetry_service.dart';
 import '../core/exceptions.dart';
 import '../core/game_copy.dart';
 import '../analytics/analytics_service.dart';
@@ -30,6 +31,12 @@ class VotingScreen extends ConsumerStatefulWidget {
 class _VotingScreenState extends ConsumerState<VotingScreen> {
   Timer? _autoAdvanceTimer;
   bool _isAdvancing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    GameTelemetryService.instance.transition('voting');
+  }
 
   @override
   void dispose() {

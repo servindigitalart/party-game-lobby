@@ -3,8 +3,10 @@ import '../../../models/room.dart';
 import '../../../models/player.dart';
 import '../../services/firebase_service.dart';
 import '../../data/repositories/room_repository.dart';
+import '../../core/crash/crash_reporter.dart';
 import '../../core/exceptions.dart';
 import '../../core/logging/log_category.dart';
+import '../../core/logging/log_level.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import '../../core/telemetry/telemetry_context.dart';
 import '../../analytics/analytics_service.dart';
@@ -54,7 +56,15 @@ class GameController {
         );
       }
     } catch (e, stackTrace) {
-      operation.fail(e, stackTrace: stackTrace, payload: {'attempts': attempts});
+      // Warning, not error: RoomRepository owns Firestore and has already
+      // reported whatever actually failed. This records the domain outcome
+      // so the timeline is complete, without a second crash report.
+      operation.fail(
+        e,
+        stackTrace: stackTrace,
+        severity: AppLogLevel.warning,
+        payload: {'attempts': attempts},
+      );
       rethrow;
     }
 
@@ -84,7 +94,8 @@ class GameController {
       final player = Player(id: playerId, name: playerName);
       room = await _roomRepository.joinRoom(code.toUpperCase(), player);
     } catch (e, stackTrace) {
-      operation.fail(e, stackTrace: stackTrace);
+      // See createRoom: the repository already reported the I/O failure.
+      operation.fail(e, stackTrace: stackTrace, severity: AppLogLevel.warning);
       rethrow;
     }
 
@@ -114,6 +125,10 @@ class GameController {
     final canStart = await _roomRepository.canRoomStartGame(roomCode);
 
     if (!canStart) {
+      // A hard product gate, not a failure: recorded as a normal event so
+      // the funnel shows where matches stop happening.
+      _telemetry.track(AppLogCategory.monetization, 'match_blocked_by_limit');
+
       // Analytics: Track blocked game
       final roomData = await _roomRepository.getRoom(roomCode);
       if (roomData != null) {
@@ -179,7 +194,31 @@ class GameController {
     return _roomRepository.watchRoom(code);
   }
 
+  /// Signs in anonymously and binds the resulting Firebase UID to every
+  /// subsequent report.
+  ///
+  /// The UID is the only stable identifier the game has — there is no
+  /// account system — and it is already non-personal, so it satisfies
+  /// docs/engineering/CRASHLYTICS.md ("Who crashed?") without collecting
+  /// anything about the player.
   Future<String> signInAnonymously() async {
-    return await _firebaseService.signInAnonymously();
+    final operation = _telemetry.start(
+      AppLogCategory.firebase,
+      'anonymous_sign_in',
+    );
+
+    final String uid;
+    try {
+      uid = await _firebaseService.signInAnonymously();
+    } catch (e, stackTrace) {
+      operation.fail(e, stackTrace: stackTrace);
+      rethrow;
+    }
+
+    CrashReporter.instance.setUser(uid);
+    _telemetry.updateContext({TelemetryKeys.playerId: uid});
+    operation.finish();
+
+    return uid;
   }
 }

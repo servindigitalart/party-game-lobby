@@ -9,6 +9,8 @@ import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../models/game_phase.dart';
 import '../providers/game_providers.dart';
+import '../core/telemetry/game_telemetry_service.dart';
+import '../core/logging/log_category.dart';
 import '../presentation/widgets/confetti_widget.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
@@ -29,6 +31,7 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
   @override
   void initState() {
     super.initState();
+    GameTelemetryService.instance.transition('round_result');
     _revealTimers.add(
       Timer(const Duration(milliseconds: 750), () {
         if (!mounted) return;
@@ -56,6 +59,23 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
   }
 
   Future<void> _nextRound(String roomCode) async {
+    // This advances the whole room for every player, so a failure here
+    // strands the match. It previously had no catch at all: the exception
+    // escaped into the zone and would now be reported as a fatal crash even
+    // though the app keeps running.
+    try {
+      await _advanceRound(roomCode);
+    } catch (e, stackTrace) {
+      GameTelemetryService.instance.fail(
+        AppLogCategory.gameplay,
+        'advance_round_failed',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _advanceRound(String roomCode) async {
     final repository = ref.read(roomRepositoryProvider);
 
     final room = await repository.cleanupDisconnectedPlayers(roomCode);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_phase.dart';
 import '../providers/game_providers.dart';
+import '../core/telemetry/game_telemetry_service.dart';
 import '../core/exceptions.dart';
 import '../core/game_copy.dart';
 import '../core/theme/app_colors.dart';
@@ -31,6 +32,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   Timer? _autoAdvanceTimer;
   int _remainingSeconds = 90;
   bool _isAdvancing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    GameTelemetryService.instance.transition('game');
+  }
 
   @override
   void dispose() {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_providers.dart';
+import '../core/telemetry/game_telemetry_service.dart';
 import '../analytics/analytics_service.dart';
 import '../core/exceptions.dart';
 import '../core/theme/app_colors.dart';
@@ -32,6 +33,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     // Track screen view
     _analytics.trackScreenView('HomeScreen');
+    GameTelemetryService.instance.transition('home');
   }
 
   @override

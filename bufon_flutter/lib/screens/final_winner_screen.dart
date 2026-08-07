@@ -16,6 +16,9 @@ import '../presentation/navigation/page_transitions.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
 import '../analytics/analytics_service.dart';
+import '../core/telemetry/game_telemetry_service.dart';
+import '../core/logging/log_category.dart';
+import '../core/logging/log_level.dart';
 import 'home_screen.dart';
 
 class FinalWinnerScreen extends StatefulWidget {
@@ -54,6 +57,7 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
     super.initState();
 
     _analytics.trackScreenView('FinalWinnerScreen');
+    GameTelemetryService.instance.transition('final_winner');
 
     _scaleController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -352,7 +356,18 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
       if (mounted) {
         HapticService.success();
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // Sharing goes through the OS share sheet and can fail for reasons
+      // outside the app (cancelled, no storage). Recorded as a warning so it
+      // stays in the trail without counting as a bug.
+      GameTelemetryService.instance.fail(
+        AppLogCategory.ui,
+        'victory_card_share_failed',
+        error: e,
+        stackTrace: stackTrace,
+        severity: AppLogLevel.warning,
+      );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

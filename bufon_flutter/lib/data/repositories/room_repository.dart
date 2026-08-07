@@ -5,16 +5,42 @@ import '../../models/room.dart';
 import '../../models/player.dart';
 import '../../models/game_phase.dart';
 import '../../core/exceptions.dart';
+import '../../core/logging/log_category.dart';
+import '../../core/logging/log_level.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
+import '../../core/telemetry/telemetry_context.dart';
 import '../../analytics/analytics_service.dart';
 
 /// Repository responsible for all Firestore room operations
 /// Uses subcollections for players instead of arrays
+///
+/// ## Instrumentation
+///
+/// This layer owns Firestore, so it is the layer that reports Firestore
+/// failures. Every mutating operation is wrapped in [_transaction] or
+/// [_write], producing a `firestore_transaction` / `firestore_write` event
+/// pair with a duration and a shared correlation id. A `started` event with
+/// no matching close is how a hung transaction becomes visible.
+///
+/// Domain events (`match_started`, `vote_submitted`, `round_started`, ...)
+/// are emitted once, by whichever path actually owns the truth. Anything
+/// observable from the room snapshot — phase, round, player count, host — is
+/// derived in [watchRoom] instead of being emitted by each write path, so no
+/// transition is reported twice.
 class RoomRepository {
   final FirebaseFirestore _firestore;
   final AnalyticsService _analytics = AnalyticsService.instance;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
   RoomRepository({FirebaseFirestore? firestore})
     : _firestore = firestore ?? FirebaseFirestore.instance;
+
+  // Last values seen through watchRoom, so a transition is reported once even
+  // when several widgets subscribe to the same room.
+  String? _lastPhase;
+  int? _lastPlayerCount;
+  int? _lastRound;
+  String? _lastHostId;
 
   // Helper to get players collection reference
   CollectionReference<Map<String, dynamic>> _playersCollection(
@@ -22,6 +48,48 @@ class RoomRepository {
   ) {
     return _firestore.collection('rooms').doc(roomCode).collection('players');
   }
+
+  /// Domain exceptions are expected control flow — a full room, an
+  /// already-cast vote, a game that already started. They belong in the
+  /// breadcrumb trail but must not become crash reports, or the beta signal
+  /// drowns in noise. Anything else (Firebase, platform, parsing) is a real
+  /// failure.
+  AppLogLevel _severityFor(Object error) =>
+      error is GameException ? AppLogLevel.warning : AppLogLevel.error;
+
+  /// Wraps a Firestore operation in one telemetry operation.
+  Future<T> _firestoreOp<T>(
+    String kind,
+    String operation,
+    Future<T> Function() body,
+  ) async {
+    final payload = {'operation': operation};
+    final telemetryOp = _telemetry.start(
+      AppLogCategory.firestore,
+      'firestore_$kind',
+      payload: payload,
+    );
+
+    try {
+      final result = await body();
+      telemetryOp.finish(payload: payload);
+      return result;
+    } catch (error, stackTrace) {
+      telemetryOp.fail(
+        error,
+        stackTrace: stackTrace,
+        payload: payload,
+        severity: _severityFor(error),
+      );
+      rethrow;
+    }
+  }
+
+  Future<T> _transaction<T>(String operation, Future<T> Function() body) =>
+      _firestoreOp('transaction', operation, body);
+
+  Future<T> _write<T>(String operation, Future<T> Function() body) =>
+      _firestoreOp('write', operation, body);
 
   /// Submit a vote using an atomic transaction
   ///
@@ -49,78 +117,82 @@ class RoomRepository {
     final voteStartTime = DateTime.now();
 
     try {
-      await _firestore.runTransaction((transaction) async {
-        // Get room to validate phase
-        final roomSnapshot = await transaction.get(roomRef);
-        if (!roomSnapshot.exists) {
-          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-        }
+      await _transaction('submit_vote', () async {
+        return await _firestore.runTransaction((transaction) async {
+          // Get room to validate phase
+          final roomSnapshot = await transaction.get(roomRef);
+          if (!roomSnapshot.exists) {
+            throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+          }
 
-        final roomData = roomSnapshot.data();
-        if (roomData == null) {
-          throw RoomException('Room data is null', code: 'INVALID_ROOM_DATA');
-        }
+          final roomData = roomSnapshot.data();
+          if (roomData == null) {
+            throw RoomException('Room data is null', code: 'INVALID_ROOM_DATA');
+          }
 
-        final room = Room.fromJson(roomData);
+          final room = Room.fromJson(roomData);
 
-        // Validate game phase
-        if (room.phase != GamePhase.voting) {
-          throw VotingException(
-            'Voting is not allowed in current game phase: ${room.phase.name}',
-            code: 'INVALID_PHASE',
-          );
-        }
+          // Validate game phase
+          if (room.phase != GamePhase.voting) {
+            throw VotingException(
+              'Voting is not allowed in current game phase: ${room.phase.name}',
+              code: 'INVALID_PHASE',
+            );
+          }
 
-        // Get voter
-        final voterSnapshot = await transaction.get(voterRef);
-        if (!voterSnapshot.exists) {
-          throw VotingException(
-            'Voter not found in room',
-            code: 'VOTER_NOT_FOUND',
-          );
-        }
+          // Get voter
+          final voterSnapshot = await transaction.get(voterRef);
+          if (!voterSnapshot.exists) {
+            throw VotingException(
+              'Voter not found in room',
+              code: 'VOTER_NOT_FOUND',
+            );
+          }
 
-        final voter = Player.fromJson(voterSnapshot.data()!);
+          final voter = Player.fromJson(voterSnapshot.data()!);
 
-        // Check if already voted
-        if (voter.votedFor != null) {
-          throw VotingException(
-            'You have already voted',
-            code: 'ALREADY_VOTED',
-          );
-        }
+          // Check if already voted
+          if (voter.votedFor != null) {
+            throw VotingException(
+              'You have already voted',
+              code: 'ALREADY_VOTED',
+            );
+          }
 
-        // Validate not voting for self
-        if (voterId == votedForId) {
-          throw VotingException(
-            'Cannot vote for yourself',
-            code: 'SELF_VOTE_FORBIDDEN',
-          );
-        }
+          // Validate not voting for self
+          if (voterId == votedForId) {
+            throw VotingException(
+              'Cannot vote for yourself',
+              code: 'SELF_VOTE_FORBIDDEN',
+            );
+          }
 
-        // Get voted-for player
-        final votedForSnapshot = await transaction.get(votedForRef);
-        if (!votedForSnapshot.exists) {
-          throw VotingException(
-            'Voted-for player not found in room',
-            code: 'VOTED_FOR_NOT_FOUND',
-          );
-        }
+          // Get voted-for player
+          final votedForSnapshot = await transaction.get(votedForRef);
+          if (!votedForSnapshot.exists) {
+            throw VotingException(
+              'Voted-for player not found in room',
+              code: 'VOTED_FOR_NOT_FOUND',
+            );
+          }
 
-        final votedForPlayer = Player.fromJson(votedForSnapshot.data()!);
-        if (votedForPlayer.currentAnswer == null ||
-            votedForPlayer.currentAnswer!.trim().isEmpty) {
-          throw VotingException(
-            'Cannot vote for a player without an answer',
-            code: 'VOTED_FOR_HAS_NO_ANSWER',
-          );
-        }
+          final votedForPlayer = Player.fromJson(votedForSnapshot.data()!);
+          if (votedForPlayer.currentAnswer == null ||
+              votedForPlayer.currentAnswer!.trim().isEmpty) {
+            throw VotingException(
+              'Cannot vote for a player without an answer',
+              code: 'VOTED_FOR_HAS_NO_ANSWER',
+            );
+          }
 
-        // Update voter: mark as voted
-        transaction.update(voterRef, {'votedFor': votedForId});
+          // Update voter: mark as voted
+          transaction.update(voterRef, {'votedFor': votedForId});
 
-        // Update voted-for player: increment score
-        transaction.update(votedForRef, {'score': votedForPlayer.score + 100});
+          // Update voted-for player: increment score
+          transaction.update(votedForRef, {
+            'score': votedForPlayer.score + 100,
+          });
+        });
       });
 
       // Track vote submission - get round number from room
@@ -129,6 +201,13 @@ class RoomRepository {
       final timeToVoteSeconds = DateTime.now()
           .difference(voteStartTime)
           .inSeconds;
+
+      // Round and room code already travel in Session Context.
+      _telemetry.track(
+        AppLogCategory.voting,
+        'vote_submitted',
+        payload: {'time_to_vote_seconds': timeToVoteSeconds},
+      );
 
       await _analytics.logVoteSubmitted(
         roomCode: roomCode,
@@ -172,22 +251,120 @@ class RoomRepository {
 
     // Combine room and players streams
     return Rx.combineLatest2<Map<String, dynamic>?, List<Player>, Room?>(
-      roomStream,
-      playersStream,
-      (roomData, players) {
-        if (roomData == null) return null;
-        return Room.fromJson(roomData, players: players);
-      },
-    );
+          roomStream,
+          playersStream,
+          (roomData, players) {
+            if (roomData == null) return null;
+            return Room.fromJson(roomData, players: players);
+          },
+        )
+        .doOnListen(
+          () => _telemetry.track(
+            AppLogCategory.firestore,
+            'room_listener_attached',
+          ),
+        )
+        .doOnCancel(() {
+          _telemetry.track(AppLogCategory.firestore, 'room_listener_detached');
+          _resetObservedRoom();
+        })
+        .doOnError(
+          (error, stackTrace) => _telemetry.fail(
+            AppLogCategory.firestore,
+            'room_listener_failed',
+            error: error,
+            stackTrace: stackTrace,
+          ),
+        )
+        .doOnData(_observeRoom);
+  }
+
+  /// Derives room lifecycle events from the snapshot stream.
+  ///
+  /// Everything observable from the room document is reported here rather
+  /// than by each write path, for three reasons: a transition is recorded on
+  /// every device that witnesses it and not only on the host's, the event
+  /// fires whichever code path caused it, and it can only be emitted once
+  /// per actual change because the comparison state lives on the repository
+  /// (a singleton) rather than per subscription.
+  ///
+  /// Session Context is refreshed on every snapshot without emitting
+  /// anything, so a crash always carries the current room, round, phase and
+  /// player count at zero breadcrumb cost.
+  void _observeRoom(Room? room) {
+    if (room == null) {
+      // The room document is gone: closed by cleanup, or deleted by the host.
+      if (_lastPhase != null) {
+        _telemetry.track(AppLogCategory.room, 'room_closed');
+        _resetObservedRoom();
+      }
+      return;
+    }
+
+    _telemetry.updateContext({
+      TelemetryKeys.roomCode: room.code,
+      TelemetryKeys.hostId: room.hostId,
+      TelemetryKeys.playerCount: room.players.length,
+      TelemetryKeys.round: room.currentRound,
+      TelemetryKeys.gameState: room.phase.name,
+      TelemetryKeys.questionId: room.currentQuestionId,
+    });
+
+    final phase = room.phase.name;
+    if (_lastPhase != null && _lastPhase != phase) {
+      _telemetry.track(
+        AppLogCategory.gameplay,
+        'phase_changed',
+        payload: {'from_phase': _lastPhase, 'to_phase': phase},
+      );
+    }
+    _lastPhase = phase;
+
+    // currentRound starts at 0 and becomes 1 when the match starts, so this
+    // covers every round including the first.
+    if (_lastRound != null && _lastRound != room.currentRound) {
+      _telemetry.track(AppLogCategory.gameplay, 'round_started');
+    }
+    _lastRound = room.currentRound;
+
+    final playerCount = room.players.length;
+    final previousCount = _lastPlayerCount;
+    if (previousCount != null && previousCount != playerCount) {
+      _telemetry.track(
+        AppLogCategory.player,
+        playerCount > previousCount ? 'player_joined' : 'player_left',
+        payload: {'previous_player_count': previousCount},
+      );
+    }
+    _lastPlayerCount = playerCount;
+
+    if (_lastHostId != null && _lastHostId != room.hostId) {
+      _telemetry.track(
+        AppLogCategory.room,
+        'host_changed',
+        payload: {'previous_host_id': _lastHostId},
+      );
+    }
+    _lastHostId = room.hostId;
+  }
+
+  void _resetObservedRoom() {
+    _lastPhase = null;
+    _lastPlayerCount = null;
+    _lastRound = null;
+    _lastHostId = null;
   }
 
   /// Update room phase
   Future<void> updatePhase(String roomCode, GamePhase phase) async {
     final oldPhase = await _getCurrentPhase(roomCode);
 
-    await _firestore.collection('rooms').doc(roomCode).update({
-      'phase': phase.name,
-    });
+    await _write(
+      'update_phase',
+      () => _firestore.collection('rooms').doc(roomCode).update({
+        'phase': phase.name,
+      }),
+    );
 
     // Track phase transitions for analytics
     final room = await getRoom(roomCode);
@@ -231,7 +408,10 @@ class RoomRepository {
   Future<void> updateRoom(Room room) async {
     final roomData = room.toJson();
     // Don't try to update players array - they're in subcollection
-    await _firestore.collection('rooms').doc(room.code).update(roomData);
+    await _write(
+      'update_room',
+      () => _firestore.collection('rooms').doc(room.code).update(roomData),
+    );
   }
 
   /// Start the first round from lobby with a selected question.
@@ -242,36 +422,42 @@ class RoomRepository {
   }) async {
     final roomRef = _firestore.collection('rooms').doc(roomCode);
 
-    await _firestore.runTransaction((transaction) async {
-      final roomSnapshot = await transaction.get(roomRef);
-      if (!roomSnapshot.exists) {
-        throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-      }
+    await _transaction('start_first_round', () async {
+      return await _firestore.runTransaction((transaction) async {
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
 
-      final room = Room.fromJson(roomSnapshot.data()!);
-      if (room.phase != GamePhase.lobby) {
-        throw RoomException(
-          'Game already started',
-          code: 'GAME_ALREADY_STARTED',
-        );
-      }
+        final room = Room.fromJson(roomSnapshot.data()!);
+        if (room.phase != GamePhase.lobby) {
+          throw RoomException(
+            'Game already started',
+            code: 'GAME_ALREADY_STARTED',
+          );
+        }
 
-      final playerCount = roomSnapshot.data()?['playerCount'] as int?;
-      if (playerCount != null && playerCount < 3) {
-        throw RoomException(
-          'At least 3 players are required',
-          code: 'NOT_ENOUGH_PLAYERS',
-        );
-      }
+        final playerCount = roomSnapshot.data()?['playerCount'] as int?;
+        if (playerCount != null && playerCount < 3) {
+          throw RoomException(
+            'At least 3 players are required',
+            code: 'NOT_ENOUGH_PLAYERS',
+          );
+        }
 
-      transaction.update(roomRef, {
-        'phase': GamePhase.answering.name,
-        'currentQuestionId': questionId,
-        'currentQuestionText': questionText,
-        'currentRound': 1,
-        'roundStartTime': DateTime.now().toIso8601String(),
+        transaction.update(roomRef, {
+          'phase': GamePhase.answering.name,
+          'currentQuestionId': questionId,
+          'currentQuestionText': questionText,
+          'currentRound': 1,
+          'roundStartTime': DateTime.now().toIso8601String(),
+        });
       });
     });
+
+    // Emitted only by the host, who owns this transition. Every other device
+    // sees it as phase_changed through the room listener.
+    _telemetry.track(AppLogCategory.gameplay, 'match_started');
   }
 
   /// Move from answering to voting after every active player has answered.
@@ -281,49 +467,51 @@ class RoomRepository {
   }) async {
     final roomRef = _firestore.collection('rooms').doc(roomCode);
 
-    await _firestore.runTransaction((transaction) async {
-      final roomSnapshot = await transaction.get(roomRef);
-      if (!roomSnapshot.exists) {
-        throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-      }
+    await _transaction('move_to_voting', () async {
+      return await _firestore.runTransaction((transaction) async {
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
 
-      final room = Room.fromJson(roomSnapshot.data()!);
-      if (room.phase != GamePhase.answering) {
-        throw RoomException(
-          'Cannot start voting from phase ${room.phase.name}',
-          code: 'INVALID_PHASE',
-        );
-      }
+        final room = Room.fromJson(roomSnapshot.data()!);
+        if (room.phase != GamePhase.answering) {
+          throw RoomException(
+            'Cannot start voting from phase ${room.phase.name}',
+            code: 'INVALID_PHASE',
+          );
+        }
 
-      final playersSnapshot = await _playersCollection(roomCode).get();
-      final players = playersSnapshot.docs
-          .map((doc) => Player.fromJson(doc.data()))
-          .toList();
-      final answeredCount = players
-          .where(
-            (player) =>
-                player.currentAnswer != null &&
-                player.currentAnswer!.trim().isNotEmpty,
-          )
-          .length;
+        final playersSnapshot = await _playersCollection(roomCode).get();
+        final players = playersSnapshot.docs
+            .map((doc) => Player.fromJson(doc.data()))
+            .toList();
+        final answeredCount = players
+            .where(
+              (player) =>
+                  player.currentAnswer != null &&
+                  player.currentAnswer!.trim().isNotEmpty,
+            )
+            .length;
 
-      if (requireAllAnswered && answeredCount < players.length) {
-        throw RoomException(
-          'Not all players have answered',
-          code: 'ANSWERS_PENDING',
-        );
-      }
+        if (requireAllAnswered && answeredCount < players.length) {
+          throw RoomException(
+            'Not all players have answered',
+            code: 'ANSWERS_PENDING',
+          );
+        }
 
-      if (answeredCount == 0) {
-        throw RoomException(
-          'No answers submitted',
-          code: 'NO_ANSWERS_SUBMITTED',
-        );
-      }
+        if (answeredCount == 0) {
+          throw RoomException(
+            'No answers submitted',
+            code: 'NO_ANSWERS_SUBMITTED',
+          );
+        }
 
-      transaction.update(roomRef, {
-        'phase': GamePhase.voting.name,
-        'roundStartTime': DateTime.now().toIso8601String(),
+        transaction.update(roomRef, {
+          'phase': GamePhase.voting.name,
+          'roundStartTime': DateTime.now().toIso8601String(),
+        });
       });
     });
   }
@@ -332,36 +520,38 @@ class RoomRepository {
   Future<void> moveToRoundResult(String roomCode) async {
     final roomRef = _firestore.collection('rooms').doc(roomCode);
 
-    await _firestore.runTransaction((transaction) async {
-      final roomSnapshot = await transaction.get(roomRef);
-      if (!roomSnapshot.exists) {
-        throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-      }
+    await _transaction('move_to_round_result', () async {
+      return await _firestore.runTransaction((transaction) async {
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
 
-      final room = Room.fromJson(roomSnapshot.data()!);
-      if (room.phase != GamePhase.voting) {
-        throw RoomException(
-          'Cannot show results from phase ${room.phase.name}',
-          code: 'INVALID_PHASE',
-        );
-      }
+        final room = Room.fromJson(roomSnapshot.data()!);
+        if (room.phase != GamePhase.voting) {
+          throw RoomException(
+            'Cannot show results from phase ${room.phase.name}',
+            code: 'INVALID_PHASE',
+          );
+        }
 
-      final playersSnapshot = await _playersCollection(roomCode).get();
-      final players = playersSnapshot.docs
-          .map((doc) => Player.fromJson(doc.data()))
-          .toList();
-      final allVoted =
-          players.isNotEmpty &&
-          players.every((player) => player.votedFor != null);
+        final playersSnapshot = await _playersCollection(roomCode).get();
+        final players = playersSnapshot.docs
+            .map((doc) => Player.fromJson(doc.data()))
+            .toList();
+        final allVoted =
+            players.isNotEmpty &&
+            players.every((player) => player.votedFor != null);
 
-      if (!allVoted) {
-        throw RoomException(
-          'Not all players have voted',
-          code: 'VOTES_PENDING',
-        );
-      }
+        if (!allVoted) {
+          throw RoomException(
+            'Not all players have voted',
+            code: 'VOTES_PENDING',
+          );
+        }
 
-      transaction.update(roomRef, {'phase': GamePhase.roundResult.name});
+        transaction.update(roomRef, {'phase': GamePhase.roundResult.name});
+      });
     });
   }
 
@@ -373,26 +563,28 @@ class RoomRepository {
   Future<bool> finishGame(String roomCode) async {
     final roomRef = _firestore.collection('rooms').doc(roomCode);
 
-    return await _firestore.runTransaction((transaction) async {
-      final roomSnapshot = await transaction.get(roomRef);
-      if (!roomSnapshot.exists) {
-        throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-      }
+    return await _transaction('finish_game', () async {
+      return _firestore.runTransaction((transaction) async {
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
 
-      final room = Room.fromJson(roomSnapshot.data()!);
-      if (room.phase == GamePhase.finalWinner) {
-        return false;
-      }
+        final room = Room.fromJson(roomSnapshot.data()!);
+        if (room.phase == GamePhase.finalWinner) {
+          return false;
+        }
 
-      if (room.phase != GamePhase.roundResult) {
-        throw RoomException(
-          'Cannot finish game from phase ${room.phase.name}',
-          code: 'INVALID_PHASE',
-        );
-      }
+        if (room.phase != GamePhase.roundResult) {
+          throw RoomException(
+            'Cannot finish game from phase ${room.phase.name}',
+            code: 'INVALID_PHASE',
+          );
+        }
 
-      transaction.update(roomRef, {'phase': GamePhase.finalWinner.name});
-      return true;
+        transaction.update(roomRef, {'phase': GamePhase.finalWinner.name});
+        return true;
+      });
     });
   }
 
@@ -411,40 +603,49 @@ class RoomRepository {
     final playerRef = _playersCollection(roomCode).doc(playerId);
 
     try {
-      await _firestore.runTransaction((transaction) async {
-        // Validate room exists and phase
-        final roomSnapshot = await transaction.get(roomRef);
-        if (!roomSnapshot.exists) {
-          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-        }
+      await _transaction('submit_answer', () async {
+        return _firestore.runTransaction((transaction) async {
+          // Validate room exists and phase
+          final roomSnapshot = await transaction.get(roomRef);
+          if (!roomSnapshot.exists) {
+            throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+          }
 
-        final room = Room.fromJson(roomSnapshot.data()!);
+          final room = Room.fromJson(roomSnapshot.data()!);
 
-        // Validate phase
-        if (room.phase != GamePhase.answering) {
-          throw GameException(
-            'Cannot submit answer in current phase: ${room.phase.name}',
-          );
-        }
+          // Validate phase
+          if (room.phase != GamePhase.answering) {
+            throw GameException(
+              'Cannot submit answer in current phase: ${room.phase.name}',
+            );
+          }
 
-        // Validate player exists
-        final playerSnapshot = await transaction.get(playerRef);
-        if (!playerSnapshot.exists) {
-          throw GameException('Player not found in room');
-        }
+          // Validate player exists
+          final playerSnapshot = await transaction.get(playerRef);
+          if (!playerSnapshot.exists) {
+            throw GameException('Player not found in room');
+          }
 
-        final player = Player.fromJson(playerSnapshot.data()!);
-        if (player.currentAnswer != null &&
-            player.currentAnswer!.trim().isNotEmpty) {
-          throw GameException(
-            'You have already answered',
-            code: 'ALREADY_ANSWERED',
-          );
-        }
+          final player = Player.fromJson(playerSnapshot.data()!);
+          if (player.currentAnswer != null &&
+              player.currentAnswer!.trim().isNotEmpty) {
+            throw GameException(
+              'You have already answered',
+              code: 'ALREADY_ANSWERED',
+            );
+          }
 
-        // Update only this player's answer
-        transaction.update(playerRef, {'currentAnswer': trimmedAnswer});
+          // Update only this player's answer
+          transaction.update(playerRef, {'currentAnswer': trimmedAnswer});
+        });
       });
+      // Answers live in the player subcollection, so this transition is not
+      // observable from the room snapshot the way phase and round are.
+      _telemetry.track(
+        AppLogCategory.gameplay,
+        'answer_submitted',
+        payload: {'answer_length': trimmedAnswer.length},
+      );
     } on FirebaseException catch (e) {
       throw RoomException(
         'Firebase error during answer submission: ${e.message}',
@@ -464,7 +665,9 @@ class RoomRepository {
       batch.update(doc.reference, {'currentAnswer': null, 'votedFor': null});
     }
 
-    await batch.commit();
+    await _write('clear_round_data', () async {
+      return batch.commit();
+    });
   }
 
   /// Delete room (and all player subcollection docs)
@@ -480,7 +683,9 @@ class RoomRepository {
     // Delete room
     batch.delete(_firestore.collection('rooms').doc(code));
 
-    await batch.commit();
+    await _write('delete_room', () async {
+      return batch.commit();
+    });
   }
 
   /// Create room (with host as first player)
@@ -507,7 +712,9 @@ class RoomRepository {
 
     batch.set(_playersCollection(code).doc(hostId), hostPlayer.toJson());
 
-    await batch.commit();
+    await _write('create_room', () async {
+      return batch.commit();
+    });
 
     return room.copyWith(players: [hostPlayer]);
   }
@@ -528,37 +735,39 @@ class RoomRepository {
 
     final fallbackPlayersSnapshot = await _playersCollection(code).get();
 
-    await _firestore.runTransaction((transaction) async {
-      // Check room exists
-      final roomSnapshot = await transaction.get(roomRef);
-      if (!roomSnapshot.exists) {
-        throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-      }
+    await _transaction('join_room', () async {
+      return _firestore.runTransaction((transaction) async {
+        // Check room exists
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
 
-      final room = Room.fromJson(roomSnapshot.data()!);
-      if (room.phase != GamePhase.lobby) {
-        throw RoomException(
-          'Game already started',
-          code: 'GAME_ALREADY_STARTED',
-        );
-      }
+        final room = Room.fromJson(roomSnapshot.data()!);
+        if (room.phase != GamePhase.lobby) {
+          throw RoomException(
+            'Game already started',
+            code: 'GAME_ALREADY_STARTED',
+          );
+        }
 
-      // Check room capacity
-      final playerCount =
-          roomSnapshot.data()?['playerCount'] as int? ??
-          fallbackPlayersSnapshot.docs.length;
-      if (playerCount >= 8) {
-        throw RoomException('Room is full', code: 'ROOM_FULL');
-      }
+        // Check room capacity
+        final playerCount =
+            roomSnapshot.data()?['playerCount'] as int? ??
+            fallbackPlayersSnapshot.docs.length;
+        if (playerCount >= 8) {
+          throw RoomException('Room is full', code: 'ROOM_FULL');
+        }
 
-      final playerSnapshot = await transaction.get(playerRef);
-      if (playerSnapshot.exists) {
-        return;
-      }
+        final playerSnapshot = await transaction.get(playerRef);
+        if (playerSnapshot.exists) {
+          return;
+        }
 
-      // Add player to subcollection
-      transaction.set(playerRef, player.toJson());
-      transaction.update(roomRef, {'playerCount': FieldValue.increment(1)});
+        // Add player to subcollection
+        transaction.set(playerRef, player.toJson());
+        transaction.update(roomRef, {'playerCount': FieldValue.increment(1)});
+      });
     });
 
     final room = await getRoom(code);
@@ -583,90 +792,114 @@ class RoomRepository {
   Future<Room?> cleanupDisconnectedPlayers(String roomCode) async {
     final roomRef = _firestore.collection('rooms').doc(roomCode);
 
+    // Captured out of the transaction so the reason players vanished can be
+    // reported after it commits. The room listener reports `player_left`,
+    // but only cleanup knows it was a heartbeat timeout.
+    var timedOutCount = 0;
+
     try {
-      final result = await _firestore.runTransaction((transaction) async {
-        // Get room
-        final roomSnapshot = await transaction.get(roomRef);
-        if (!roomSnapshot.exists) {
-          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-        }
-
-        final roomData = roomSnapshot.data()!;
-        final currentHostId = roomData['hostId'] as String;
-
-        // Get all players
-        final playersSnapshot = await _playersCollection(roomCode).get();
-        final now = DateTime.now();
-
-        final activePlayers = <Player>[];
-        final disconnectedPlayerIds = <String>[];
-
-        for (final doc in playersSnapshot.docs) {
-          final player = Player.fromJson(doc.data());
-          final timeSinceLastSeen = now.difference(player.lastSeen);
-
-          if (timeSinceLastSeen.inSeconds <= 20) {
-            activePlayers.add(player);
-          } else {
-            disconnectedPlayerIds.add(player.id);
+      final result = await _transaction('cleanup_players', () async {
+        return _firestore.runTransaction((transaction) async {
+          // Get room
+          final roomSnapshot = await transaction.get(roomRef);
+          if (!roomSnapshot.exists) {
+            throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
           }
-        }
 
-        // No changes needed
-        if (disconnectedPlayerIds.isEmpty) {
-          return Room.fromJson(roomData, players: activePlayers);
-        }
+          final roomData = roomSnapshot.data()!;
+          final currentHostId = roomData['hostId'] as String;
 
-        // Delete disconnected players
-        for (final playerId in disconnectedPlayerIds) {
-          transaction.delete(_playersCollection(roomCode).doc(playerId));
-        }
+          // Get all players
+          final playersSnapshot = await _playersCollection(roomCode).get();
+          final now = DateTime.now();
 
-        // If fewer than 2 players, delete room
-        if (activePlayers.length < 2) {
-          // Delete all remaining players
-          for (final player in activePlayers) {
-            transaction.delete(_playersCollection(roomCode).doc(player.id));
-          }
-          transaction.delete(roomRef);
-          return null;
-        }
+          final activePlayers = <Player>[];
+          final disconnectedPlayerIds = <String>[];
 
-        // Check if host was disconnected
-        final hostStillActive = activePlayers.any((p) => p.id == currentHostId);
+          for (final doc in playersSnapshot.docs) {
+            final player = Player.fromJson(doc.data());
+            final timeSinceLastSeen = now.difference(player.lastSeen);
 
-        if (!hostStillActive) {
-          // Reassign host to first active player
-          final newHostId = activePlayers.first.id;
-
-          // Update room hostId
-          transaction.update(roomRef, {
-            'hostId': newHostId,
-            'playerCount': activePlayers.length,
-          });
-
-          // Update old host flag (if they exist)
-          for (final player in activePlayers) {
-            if (player.id == newHostId && !player.isHost) {
-              transaction.update(_playersCollection(roomCode).doc(player.id), {
-                'isHost': true,
-              });
-            } else if (player.id != newHostId && player.isHost) {
-              transaction.update(_playersCollection(roomCode).doc(player.id), {
-                'isHost': false,
-              });
+            if (timeSinceLastSeen.inSeconds <= 20) {
+              activePlayers.add(player);
+            } else {
+              disconnectedPlayerIds.add(player.id);
             }
           }
 
-          return Room.fromJson({
-            ...roomData,
-            'hostId': newHostId,
-          }, players: activePlayers);
-        }
+          // No changes needed
+          if (disconnectedPlayerIds.isEmpty) {
+            return Room.fromJson(roomData, players: activePlayers);
+          }
 
-        transaction.update(roomRef, {'playerCount': activePlayers.length});
-        return Room.fromJson(roomData, players: activePlayers);
+          timedOutCount = disconnectedPlayerIds.length;
+
+          // Delete disconnected players
+          for (final playerId in disconnectedPlayerIds) {
+            transaction.delete(_playersCollection(roomCode).doc(playerId));
+          }
+
+          // If fewer than 2 players, delete room
+          if (activePlayers.length < 2) {
+            // Delete all remaining players
+            for (final player in activePlayers) {
+              transaction.delete(_playersCollection(roomCode).doc(player.id));
+            }
+            transaction.delete(roomRef);
+            return null;
+          }
+
+          // Check if host was disconnected
+          final hostStillActive = activePlayers.any(
+            (p) => p.id == currentHostId,
+          );
+
+          if (!hostStillActive) {
+            // Reassign host to first active player
+            final newHostId = activePlayers.first.id;
+
+            // Update room hostId
+            transaction.update(roomRef, {
+              'hostId': newHostId,
+              'playerCount': activePlayers.length,
+            });
+
+            // Update old host flag (if they exist)
+            for (final player in activePlayers) {
+              if (player.id == newHostId && !player.isHost) {
+                transaction.update(
+                  _playersCollection(roomCode).doc(player.id),
+                  {'isHost': true},
+                );
+              } else if (player.id != newHostId && player.isHost) {
+                transaction.update(
+                  _playersCollection(roomCode).doc(player.id),
+                  {'isHost': false},
+                );
+              }
+            }
+
+            return Room.fromJson({
+              ...roomData,
+              'hostId': newHostId,
+            }, players: activePlayers);
+          }
+
+          transaction.update(roomRef, {'playerCount': activePlayers.length});
+          return Room.fromJson(roomData, players: activePlayers);
+        });
       });
+
+      if (timedOutCount > 0) {
+        _telemetry.track(
+          AppLogCategory.network,
+          'players_timed_out',
+          payload: {
+            'timed_out_count': timedOutCount,
+            'room_deleted': result == null,
+          },
+        );
+      }
 
       // Track disconnections outside transaction
       if (result != null) {
@@ -704,48 +937,50 @@ class RoomRepository {
   Future<bool> canRoomStartGame(String roomCode) async {
     final roomRef = _firestore.collection('rooms').doc(roomCode);
 
-    return await _firestore.runTransaction((transaction) async {
-      final roomSnapshot = await transaction.get(roomRef);
-      if (!roomSnapshot.exists) {
-        throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-      }
+    return await _transaction('can_start_game', () async {
+      return _firestore.runTransaction((transaction) async {
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
 
-      final roomData = roomSnapshot.data()!;
-      final room = Room.fromJson(roomData);
+        final roomData = roomSnapshot.data()!;
+        final room = Room.fromJson(roomData);
 
-      // Get current date (yyyy-MM-dd)
-      final today = _formatDate(DateTime.now());
+        // Get current date (yyyy-MM-dd)
+        final today = _formatDate(DateTime.now());
 
-      // Check if day changed - reset counter if needed
-      if (room.lastGameDate != null && room.lastGameDate != today) {
-        transaction.update(roomRef, {
-          'gamesPlayedToday': 0,
-          'lastGameDate': today,
-        });
-        return true; // New day, allow game
-      }
+        // Check if day changed - reset counter if needed
+        if (room.lastGameDate != null && room.lastGameDate != today) {
+          transaction.update(roomRef, {
+            'gamesPlayedToday': 0,
+            'lastGameDate': today,
+          });
+          return true; // New day, allow game
+        }
 
-      // Priority 1: Check Night Pass
-      if (room.nightPassExpiresAt != null &&
-          room.nightPassExpiresAt!.isAfter(DateTime.now())) {
-        return true; // Night Pass active - unlimited games
-      }
+        // Priority 1: Check Night Pass
+        if (room.nightPassExpiresAt != null &&
+            room.nightPassExpiresAt!.isAfter(DateTime.now())) {
+          return true; // Night Pass active - unlimited games
+        }
 
-      // Priority 2: Check ad unlocks
-      if (room.adUnlocksRemaining > 0) {
-        transaction.update(roomRef, {
-          'adUnlocksRemaining': FieldValue.increment(-1),
-        });
-        return true; // Consume ad unlock
-      }
+        // Priority 2: Check ad unlocks
+        if (room.adUnlocksRemaining > 0) {
+          transaction.update(roomRef, {
+            'adUnlocksRemaining': FieldValue.increment(-1),
+          });
+          return true; // Consume ad unlock
+        }
 
-      // Priority 3: Check daily limit
-      if (room.gamesPlayedToday < 3) {
-        return true; // Under limit
-      }
+        // Priority 3: Check daily limit
+        if (room.gamesPlayedToday < 3) {
+          return true; // Under limit
+        }
 
-      // Blocked - need ad or Night Pass
-      return false;
+        // Blocked - need ad or Night Pass
+        return false;
+      });
     });
   }
 
@@ -754,27 +989,29 @@ class RoomRepository {
     final roomRef = _firestore.collection('rooms').doc(roomCode);
     final today = _formatDate(DateTime.now());
 
-    await _firestore.runTransaction((transaction) async {
-      final roomSnapshot = await transaction.get(roomRef);
-      if (!roomSnapshot.exists) {
-        throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-      }
+    await _transaction('increment_games_played', () async {
+      return _firestore.runTransaction((transaction) async {
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
 
-      final roomData = roomSnapshot.data()!;
-      final room = Room.fromJson(roomData);
+        final roomData = roomSnapshot.data()!;
+        final room = Room.fromJson(roomData);
 
-      // Reset counter if day changed
-      if (room.lastGameDate != null && room.lastGameDate != today) {
-        transaction.update(roomRef, {
-          'gamesPlayedToday': 1,
-          'lastGameDate': today,
-        });
-      } else {
-        transaction.update(roomRef, {
-          'gamesPlayedToday': FieldValue.increment(1),
-          'lastGameDate': today,
-        });
-      }
+        // Reset counter if day changed
+        if (room.lastGameDate != null && room.lastGameDate != today) {
+          transaction.update(roomRef, {
+            'gamesPlayedToday': 1,
+            'lastGameDate': today,
+          });
+        } else {
+          transaction.update(roomRef, {
+            'gamesPlayedToday': FieldValue.increment(1),
+            'lastGameDate': today,
+          });
+        }
+      });
     });
   }
 
@@ -784,14 +1021,16 @@ class RoomRepository {
   Future<void> grantAdUnlock(String roomCode) async {
     final roomRef = _firestore.collection('rooms').doc(roomCode);
 
-    await _firestore.runTransaction((transaction) async {
-      final roomSnapshot = await transaction.get(roomRef);
-      if (!roomSnapshot.exists) {
-        throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-      }
+    await _transaction('grant_ad_unlock', () async {
+      return _firestore.runTransaction((transaction) async {
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
 
-      transaction.update(roomRef, {
-        'adUnlocksRemaining': FieldValue.increment(1),
+        transaction.update(roomRef, {
+          'adUnlocksRemaining': FieldValue.increment(1),
+        });
       });
     });
   }
