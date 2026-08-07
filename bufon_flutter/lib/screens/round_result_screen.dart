@@ -119,7 +119,6 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
     final roomAsync = ref.watch(roomStreamProvider);
     final userId = ref.watch(userIdProvider);
 
-
     return roomAsync.when(
       data: (room) {
         if (room == null) {

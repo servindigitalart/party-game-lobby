@@ -1,11 +1,12 @@
 // presentation/screens/paywall_screen.dart
 import 'package:flutter/material.dart';
+import '../../core/logging/log_category.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/ad_service.dart';
 import '../../services/iap_service.dart';
 import '../../data/repositories/room_repository.dart';
 import '../../providers/game_providers.dart';
-import '../../analytics/analytics_service.dart';
 
 /// Paywall screen shown when room hits monetization limit
 ///
@@ -23,7 +24,7 @@ class PaywallScreen extends ConsumerStatefulWidget {
 
 class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   bool _isLoading = false;
-  final AnalyticsService _analytics = AnalyticsService.instance;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
   @override
   void initState() {
@@ -32,18 +33,22 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   }
 
   Future<void> _trackPaywallShown() async {
+    // This read stays: gamesPlayedToday and adUnlocksRemaining are the
+    // paywall's own trigger conditions, not shared Session Context.
     final repository = RoomRepository();
     final room = await repository.getRoom(widget.roomCode);
+    if (room == null) return;
 
-    if (room != null) {
-      await _analytics.logPaywallShown(
-        roomCode: widget.roomCode,
-        gamesPlayedToday: room.gamesPlayedToday,
-        triggerReason: room.adUnlocksRemaining > 0
+    _telemetry.track(
+      AppLogCategory.purchases,
+      'paywall_shown',
+      payload: {
+        'games_played_today': room.gamesPlayedToday,
+        'trigger_reason': room.adUnlocksRemaining > 0
             ? 'no_bonus_games'
             : 'free_limit',
-      );
-    }
+      },
+    );
   }
 
   Future<void> _watchAd() async {

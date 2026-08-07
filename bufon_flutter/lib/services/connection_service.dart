@@ -169,9 +169,11 @@ class ConnectionService {
     _isActive = false;
     _heartbeatTimer?.cancel();
 
+    // `app_backgrounded` belongs to AppSessionObserver, which sees the
+    // lifecycle whether or not the player is in a room. Only the network
+    // status is this service's to report.
     if (wasActive) {
       _telemetry.updateContext({TelemetryKeys.networkStatus: 'backgrounded'});
-      _telemetry.track(AppLogCategory.app, 'app_backgrounded');
     }
 
     _markOffline();
@@ -181,7 +183,6 @@ class ConnectionService {
   void resumeHeartbeat() {
     if (_currentRoomCode != null && _currentPlayerId != null) {
       _isActive = true;
-      _telemetry.track(AppLogCategory.app, 'app_resumed');
       _sendHeartbeat();
       _heartbeatTimer = Timer.periodic(
         const Duration(seconds: 10),

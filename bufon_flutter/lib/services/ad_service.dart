@@ -1,8 +1,10 @@
 // services/ad_service.dart
 import 'dart:io';
+import '../core/telemetry/telemetry_event.dart';
+import '../core/logging/log_level.dart';
+import '../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import '../analytics/analytics_service.dart';
 import '../core/logging/app_logger.dart';
 import '../core/logging/log_category.dart';
 
@@ -22,8 +24,7 @@ class AdService {
   bool _isShowing = false;
   int _loadAttempts = 0;
   static const int _maxLoadAttempts = 3;
-
-  final AnalyticsService _analytics = AnalyticsService.instance;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
   DateTime? _adStartTime;
 
   // Test ad unit IDs (safe for development)
@@ -190,13 +191,13 @@ class AdService {
     bool rewardEarned = false;
     _adStartTime = DateTime.now();
 
-    // Analytics: Track ad watch initiation
-    if (roomCode != null) {
-      await _analytics.logRewardedAdWatched(
-        roomCode: roomCode,
-        gamesPlayedToday: 0, // Will be updated by caller with actual value
-      );
-    }
+    // Room code already travels in Session Context, so the event no longer
+    // needs one and fires even when the caller did not pass it.
+    _telemetry.track(
+      AppLogCategory.ads,
+      'rewarded_ad_started',
+      payload: {'ad_network': 'admob'},
+    );
 
     try {
       // Show the ad with reward callback
@@ -213,24 +214,31 @@ class AdService {
       // Wait a bit to ensure reward callback fires if earned
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // Analytics: Track ad completion
-      if (roomCode != null) {
-        final duration = _adStartTime != null
-            ? DateTime.now().difference(_adStartTime!).inSeconds
-            : 0;
+      final duration = _adStartTime != null
+          ? DateTime.now().difference(_adStartTime!)
+          : Duration.zero;
 
-        if (rewardEarned) {
-          await _analytics.logRewardedAdCompleted(
-            roomCode: roomCode,
-            rewardAmount: 1,
-            timeToCompleteSeconds: duration,
-          );
-        } else {
-          await _analytics.logRewardedAdFailed(
-            roomCode: roomCode,
-            failureReason: 'user_dismissed_before_completion',
-          );
-        }
+      if (rewardEarned) {
+        _telemetry.track(
+          AppLogCategory.ads,
+          'rewarded_ad_completed',
+          duration: duration,
+          payload: {'ad_network': 'admob', 'reward_amount': 1},
+        );
+      } else {
+        // Dismissing an ad early is ordinary user behaviour, not a defect:
+        // warning severity keeps it out of crash reporting.
+        _telemetry.track(
+          AppLogCategory.ads,
+          'rewarded_ad_completed',
+          status: TelemetryStatus.failed,
+          severity: AppLogLevel.warning,
+          duration: duration,
+          payload: {
+            'ad_network': 'admob',
+            'failure_reason': 'user_dismissed_before_completion',
+          },
+        );
       }
 
       return rewardEarned;
@@ -241,13 +249,15 @@ class AdService {
         error: e,
       );
 
-      // Analytics: Track failure
-      if (roomCode != null) {
-        await _analytics.logRewardedAdFailed(
-          roomCode: roomCode,
-          failureReason: 'exception_${e.runtimeType}',
-        );
-      }
+      _telemetry.fail(
+        AppLogCategory.ads,
+        'rewarded_ad_completed',
+        error: e,
+        payload: {
+          'ad_network': 'admob',
+          'failure_reason': 'exception_${e.runtimeType}',
+        },
+      );
 
       return false;
     }

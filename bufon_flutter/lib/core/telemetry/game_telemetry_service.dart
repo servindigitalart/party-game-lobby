@@ -49,8 +49,7 @@ import 'telemetry_operation.dart';
 class GameTelemetryService {
   GameTelemetryService._internal();
 
-  static final GameTelemetryService instance =
-      GameTelemetryService._internal();
+  static final GameTelemetryService instance = GameTelemetryService._internal();
 
   /// Device-level keys that outlive an individual play session.
   static const List<String> _deviceKeys = [

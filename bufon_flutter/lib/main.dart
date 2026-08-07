@@ -4,11 +4,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'analytics/analytics_destination.dart';
-import 'analytics/analytics_service.dart';
+import 'analytics/retention_tracker.dart';
 import 'core/crash/crash_reporter.dart';
 import 'core/crash/firebase_crashlytics_backend.dart';
 import 'core/logging/app_logger.dart';
 import 'core/logging/log_category.dart';
+import 'core/telemetry/app_session_observer.dart';
 import 'core/telemetry/game_telemetry_service.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
@@ -76,12 +77,16 @@ void main() {
     // session and launch events, which are the base of every retention
     // funnel. Crash context is unaffected — device context is already set by
     // telemetry.init() above, and there is no room yet at this point.
-    await AnalyticsService.instance.initialize();
-    telemetry.startSession();
+    await RetentionTracker.instance.initialize();
+
+    // Owns startSession/endSession from here on, so session duration tracks
+    // real foreground time instead of never ending.
+    AppSessionObserver().start();
+
     telemetry.track(
       AppLogCategory.app,
       'app_started',
-      payload: await AnalyticsService.instance.readLaunchMetrics(),
+      payload: await RetentionTracker.instance.readLaunchMetrics(),
     );
 
     runApp(const ProviderScope(child: MyApp()));

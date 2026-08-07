@@ -1,5 +1,7 @@
 // presentation/screens/profile_public_screen.dart
 import 'package:flutter/material.dart';
+import '../../core/logging/log_category.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -12,7 +14,6 @@ import '../../providers/progression_providers.dart';
 import '../../providers/leaderboard_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/haptic_service.dart';
-import '../../analytics/analytics_service.dart';
 import '../dialogs/title_selector_dialog.dart';
 import '../widgets/share_profile_card.dart';
 import '../widgets/season_badges_section.dart';
@@ -48,7 +49,7 @@ class ProfilePublicScreen extends ConsumerStatefulWidget {
 
 class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
     with SingleTickerProviderStateMixin {
-  final _analytics = AnalyticsService.instance;
+  final _telemetry = GameTelemetryService.instance;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -72,12 +73,16 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
 
     _animationController.forward();
 
-    // Track analytics
+    _telemetry.transition('profile_public');
+
     final currentUserId = ref.read(userIdProvider);
-    final isOwn = currentUserId == widget.userId;
-    _analytics.logProfileViewed(
-      isOwnProfile: isOwn,
-      hasTitle: false, // Will update when profile loads
+    _telemetry.track(
+      AppLogCategory.ui,
+      'profile_viewed',
+      payload: {
+        'is_own_profile': currentUserId == widget.userId,
+        'has_title': false, // Will update when profile loads
+      },
     );
   }
 
@@ -731,10 +736,13 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
         XFile(file.path),
       ], text: '¡Mira mi perfil en BUFÓN! 🎭');
 
-      // Track analytics
-      await _analytics.logProfileShared(
-        hasTitle: profile.equippedTitleId != null,
-        level: profile.level,
+      _telemetry.track(
+        AppLogCategory.ui,
+        'profile_shared',
+        payload: {
+          'has_title': profile.equippedTitleId != null,
+          'level': profile.level,
+        },
       );
 
       // Clean up

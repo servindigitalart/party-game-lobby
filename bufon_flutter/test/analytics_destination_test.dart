@@ -93,16 +93,25 @@ void main() {
       );
     });
 
-    test('legacy analytics-category events pass through verbatim', () async {
+    test('progression events are mapped, not passed through', () async {
       telemetry.track(
-        AppLogCategory.analytics,
+        AppLogCategory.progression,
         'xp_awarded',
-        payload: {'xp_amount': 50},
+        payload: {'xp_amount': 50, 'reason': 'game_completion'},
       );
       await settle();
 
       expect(destination.events.single.name, 'xp_awarded');
       expect(destination.events.single.parameters['xp_amount'], 50);
+    });
+
+    test('an unmapped event is dropped whatever its category', () async {
+      // There is no passthrough any more: category alone never grants
+      // access to Firebase.
+      telemetry.track(AppLogCategory.progression, 'some_internal_step');
+      await settle();
+
+      expect(destination.events, isEmpty);
     });
 
     test('screen changes use the dedicated screen-view API', () async {
@@ -217,16 +226,16 @@ void main() {
 
     test('booleans become numbers and long strings are truncated', () async {
       telemetry.track(
-        AppLogCategory.analytics,
-        'game_completed',
-        payload: {'is_winner': true, 'reason': 'y' * 250},
+        AppLogCategory.progression,
+        'xp_awarded',
+        payload: {'level_up': true, 'reason': 'y' * 250},
       );
       await settle();
 
       final parameters = destination.events.single.parameters;
       // Firebase rejects bool parameters; they used to be passed straight
       // through by AnalyticsService.
-      expect(parameters['is_winner'], 1);
+      expect(parameters['level_up'], 1);
       expect((parameters['reason']! as String).length, 100);
     });
 

@@ -554,8 +554,8 @@ event; analytics receives it automatically. No feature calls analytics.
 ## Mapping registry
 
 `lib/analytics/analytics_event_mapping.dart` maps telemetry event names to
-analytics event names. It is an **allowlist**: a telemetry event with no
-entry never reaches Firebase.
+analytics event names. It is an **allowlist with no exceptions**: a telemetry
+event with no entry never reaches Firebase, whatever its category.
 
 That filter is the point. Telemetry emits engineering diagnostics
 (`firestore_transaction`, `heartbeat_failed`, `room_listener_attached`) at a
@@ -600,16 +600,28 @@ of which Firebase requires.
 `screen_changed` telemetry becomes `logScreenView`, not a custom event, so it
 lands in Firebase's built-in screen reports.
 
-## AnalyticsService
+## Sessions
 
-`AnalyticsService` no longer touches Firebase. It remains for two reasons:
+A session is one **foreground period**, owned by `AppSessionObserver`
+(`lib/core/telemetry/`). It opens when the app becomes visible and closes when
+it leaves the foreground, so `session_ended` carries a duration that means
+something. Measuring from launch to process death would count backgrounded
+hours, and `detached` is not reliably delivered on iOS, so sessions would
+never end at all.
 
-1. Progression, seasons, titles, leaderboards, ads and purchases are not
-   instrumented with telemetry yet. Their events are emitted under the
-   `analytics` log category, which the destination forwards verbatim. Each
-   moves into the registry as its feature is instrumented.
-2. Retention metrics (days since install, session counts, return windows) are
-   stateful bookkeeping over SharedPreferences that telemetry cannot derive.
+`inactive` is ignored: it fires for notification shades, incoming calls and
+the app switcher, and ending a session there would shred the metric.
+
+## RetentionTracker
+
+`AnalyticsService` no longer exists. The only thing that survived it is
+`RetentionTracker`, which owns the SharedPreferences bookkeeping telemetry
+cannot derive: days since install, total launches, and time since the previous
+launch. Those are facts about *previous runs of the process*.
+
+It emits `returned_same_day` / `returned_next_day` / `returned_after_week`
+as ordinary telemetry, and returns this launch's metrics for `main` to attach
+to `app_started`. It does not know Firebase exists.
 
 ---
 

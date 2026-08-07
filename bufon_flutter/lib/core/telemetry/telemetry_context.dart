@@ -21,6 +21,7 @@ class TelemetryKeys {
   static const String questionId = 'question_id';
   static const String gameState = 'game_state';
   static const String networkStatus = 'network_status';
+  static const String sessionDurationSeconds = 'session_duration_seconds';
 
   // --- Device Context (resolved once at init) ---
   static const String platform = 'platform';

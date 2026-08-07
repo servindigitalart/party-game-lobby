@@ -253,10 +253,7 @@ class AppLogger {
       return;
     }
 
-    final mergedContext = <String, dynamic>{
-      ..._collectContext(),
-      ...?context,
-    };
+    final mergedContext = <String, dynamic>{..._collectContext(), ...?context};
 
     final entry = AppLogEntry(
       level: level,

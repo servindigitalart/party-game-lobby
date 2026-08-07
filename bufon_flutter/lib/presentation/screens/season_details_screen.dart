@@ -1,5 +1,7 @@
 // presentation/screens/season_details_screen.dart
 import 'package:flutter/material.dart';
+import '../../core/logging/log_category.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -7,7 +9,6 @@ import '../../core/theme/app_typography.dart';
 import '../../models/season.dart';
 import '../../providers/leaderboard_providers.dart';
 import '../../providers/game_providers.dart';
-import '../../analytics/analytics_service.dart';
 import '../../models/leaderboard_entry.dart';
 
 class SeasonDetailsScreen extends ConsumerStatefulWidget {
@@ -21,14 +22,19 @@ class SeasonDetailsScreen extends ConsumerStatefulWidget {
 }
 
 class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
-  final _analytics = AnalyticsService.instance;
+  final _telemetry = GameTelemetryService.instance;
 
   @override
   void initState() {
     super.initState();
-    _analytics.logSeasonViewed(
-      seasonId: widget.season.id,
-      daysRemaining: widget.season.daysRemaining,
+    _telemetry.transition('season_details');
+    _telemetry.track(
+      AppLogCategory.season,
+      'season_viewed',
+      payload: {
+        'season_id': widget.season.id,
+        'days_remaining': widget.season.daysRemaining,
+      },
     );
   }
 

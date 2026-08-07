@@ -1,8 +1,9 @@
 // domain/controllers/leaderboard_controller.dart
 import '../../data/repositories/leaderboard_repository.dart';
+import '../../core/logging/log_category.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
 import '../../models/leaderboard_entry.dart';
 import '../../models/user_profile.dart';
-import '../../analytics/analytics_service.dart';
 import '../../core/exceptions.dart';
 
 /// Controller for leaderboard operations
@@ -14,7 +15,7 @@ import '../../core/exceptions.dart';
 /// - Track leaderboard analytics
 class LeaderboardController {
   final LeaderboardRepository _repository;
-  final AnalyticsService _analytics = AnalyticsService.instance;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
   LeaderboardController({LeaderboardRepository? repository})
     : _repository = repository ?? LeaderboardRepository();
@@ -54,12 +55,14 @@ class LeaderboardController {
         votesGained: votesGained,
       );
 
-      // Track analytics
-      await _analytics.logLeaderboardsUpdated(
-        xpGained: xpGained,
-        winsGained: winsGained,
-        votesGained: votesGained,
-        weekKey: _repository.getCurrentWeekKey(),
+      _telemetry.track(
+        AppLogCategory.leaderboard,
+        'leaderboards_updated',
+        payload: {
+          'xp_gained': xpGained,
+          'wins_gained': winsGained,
+          'votes_gained': votesGained,
+        },
       );
     } catch (e) {
       throw GameException('Failed to update leaderboards: $e');
@@ -81,13 +84,10 @@ class LeaderboardController {
         limit: limit,
       );
 
-      // Track analytics
-      await _analytics.logLeaderboardViewed(
-        type: type.name,
-        weekKey: type != LeaderboardType.globalXp
-            ? _repository.getCurrentWeekKey()
-            : null,
-        entriesCount: entries.length,
+      _telemetry.track(
+        AppLogCategory.leaderboard,
+        'leaderboard_viewed',
+        payload: {'type': type.name, 'entries_count': entries.length},
       );
 
       return entries;
@@ -107,14 +107,14 @@ class LeaderboardController {
       final entry = await _repository.fetchUserRank(uid: uid, type: type);
 
       if (entry != null) {
-        // Track analytics for rank achievement
-        await _analytics.logLeaderboardRankAchieved(
-          type: type.name,
-          rank: entry.rank!,
-          statValue: entry.getStatValue(type),
-          weekKey: type != LeaderboardType.globalXp
-              ? _repository.getCurrentWeekKey()
-              : null,
+        _telemetry.track(
+          AppLogCategory.leaderboard,
+          'leaderboard_rank_achieved',
+          payload: {
+            'type': type.name,
+            'rank': entry.rank!,
+            'stat_value': entry.getStatValue(type),
+          },
         );
       }
 

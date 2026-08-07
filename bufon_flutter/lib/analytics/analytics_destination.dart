@@ -9,7 +9,6 @@ import 'package:flutter/foundation.dart';
 
 import '../core/logging/app_log_destination.dart';
 import '../core/logging/app_log_entry.dart';
-import '../core/logging/log_category.dart';
 import '../core/telemetry/telemetry_context.dart';
 import '../core/telemetry/telemetry_event.dart';
 import 'analytics_event_mapping.dart';
@@ -28,10 +27,8 @@ import 'analytics_event_mapping.dart';
 ///
 /// Two things are deliberately *not* forwarded:
 ///
-/// * Anything without a registry entry (see [analyticsEventMappings]),
-///   unless it is a legacy [AppLogCategory.analytics] event still produced
-///   by AnalyticsService. Engineering diagnostics stay in Talker and
-///   Crashlytics.
+/// * Anything without a registry entry (see [analyticsEventMappings]).
+///   Engineering diagnostics stay in Talker and Crashlytics.
 /// * `started` halves of operations, which would double-count every action.
 class AnalyticsDestination implements AppLogDestination {
   AnalyticsDestination({FirebaseAnalytics? analytics}) : _analytics = analytics;
@@ -97,28 +94,15 @@ class AnalyticsDestination implements AppLogDestination {
     }
 
     final mapping = analyticsEventMappings[event.name];
+    if (mapping == null) return;
 
-    final String name;
-    final Map<String, dynamic> payload;
+    final name = mapping.resolve(event);
+    if (name == null) return;
 
-    if (mapping != null) {
-      final resolved = mapping.resolve(event);
-      if (resolved == null) return;
-      name = resolved;
-      payload = {
-        for (final key in mapping.parameters)
-          if (event.payload.containsKey(key)) key: event.payload[key],
-      };
-    } else if (event.category == AppLogCategory.analytics) {
-      // Legacy path: events AnalyticsService still emits directly for
-      // progression and monetization, which are analytics events by
-      // construction. They move into the registry as their features get
-      // properly instrumented.
-      name = event.name;
-      payload = event.payload;
-    } else {
-      return;
-    }
+    final payload = {
+      for (final key in mapping.parameters)
+        if (event.payload.containsKey(key)) key: event.payload[key],
+    };
 
     sendEvent(name, _buildParameters(payload, entry.context));
   }

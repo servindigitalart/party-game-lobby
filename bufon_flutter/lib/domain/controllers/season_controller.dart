@@ -1,18 +1,17 @@
 // domain/controllers/season_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
 import '../../models/season.dart';
 import '../../models/leaderboard_entry.dart';
-import '../../analytics/analytics_service.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/logging/log_category.dart';
 
 class SeasonController {
   final FirebaseFirestore _firestore;
-  final AnalyticsService _analytics;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
-  SeasonController({FirebaseFirestore? firestore, AnalyticsService? analytics})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _analytics = analytics ?? AnalyticsService.instance;
+  SeasonController({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   Future<Season?> getCurrentSeason() async {
     try {
@@ -86,9 +85,10 @@ class SeasonController {
         _archiveSeasonResults(seasonId),
       ]);
 
-      await _analytics.logSeasonEnded(
-        seasonId: seasonId,
-        seasonName: season.name,
+      _telemetry.track(
+        AppLogCategory.season,
+        'season_ended',
+        payload: {'season_id': seasonId},
       );
 
       AppLogger.instance.info(
@@ -177,11 +177,17 @@ class SeasonController {
           });
         }
 
-        await _analytics.logSeasonRewardGranted(
-          seasonId: seasonId,
-          userId: userId,
-          rank: rank,
-          reward: titleId ?? frameId ?? badgeId ?? 'participation',
+        // The recipient is another player, so their id is deliberately not
+        // in the payload: the destination binds analytics to the current
+        // user, and rank plus reward is what the funnel needs.
+        _telemetry.track(
+          AppLogCategory.season,
+          'season_reward_granted',
+          payload: {
+            'season_id': seasonId,
+            'rank': rank,
+            'reward': titleId ?? frameId ?? badgeId ?? 'participation',
+          },
         );
       }
 
@@ -271,9 +277,10 @@ class SeasonController {
 
       await seasonRef.set(season.toFirestore());
 
-      await _analytics.logSeasonStarted(
-        seasonId: season.id,
-        seasonName: season.name,
+      _telemetry.track(
+        AppLogCategory.season,
+        'season_started',
+        payload: {'season_id': season.id},
       );
 
       return season;

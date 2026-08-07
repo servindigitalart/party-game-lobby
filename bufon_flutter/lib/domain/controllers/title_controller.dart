@@ -1,8 +1,9 @@
 // domain/controllers/title_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/logging/log_category.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
 import '../../models/title.dart';
 import '../../models/user_profile.dart';
-import '../../analytics/analytics_service.dart';
 import '../../core/exceptions.dart';
 
 /// Controller for title system
@@ -15,7 +16,7 @@ import '../../core/exceptions.dart';
 /// - Integrate with analytics
 class TitleController {
   final FirebaseFirestore _firestore;
-  final AnalyticsService _analytics = AnalyticsService.instance;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
   TitleController({FirebaseFirestore? firestore})
     : _firestore = firestore ?? FirebaseFirestore.instance;
@@ -162,14 +163,16 @@ class TitleController {
         transaction.set(titleRef, unlockedTitle.toJson());
       });
 
-      // Track analytics
       final title = Titles.getById(titleId);
       if (title != null) {
-        await _analytics.logTitleUnlocked(
-          titleId: titleId,
-          titleName: title.name,
-          rarity: title.rarity.name,
-          source: source,
+        _telemetry.track(
+          AppLogCategory.progression,
+          'title_unlocked',
+          payload: {
+            'title_id': titleId,
+            'rarity': title.rarity.name,
+            'source': source,
+          },
         );
       }
     } on FirebaseException catch (e) {
@@ -203,13 +206,12 @@ class TitleController {
         transaction.update(userRef, {'equippedTitleId': titleId});
       });
 
-      // Track analytics
       final title = Titles.getById(titleId);
       if (title != null) {
-        await _analytics.logTitleEquipped(
-          titleId: titleId,
-          titleName: title.name,
-          rarity: title.rarity.name,
+        _telemetry.track(
+          AppLogCategory.progression,
+          'title_equipped',
+          payload: {'title_id': titleId, 'rarity': title.rarity.name},
         );
       }
     } on FirebaseException catch (e) {

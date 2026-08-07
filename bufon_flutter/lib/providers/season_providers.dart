@@ -2,10 +2,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/controllers/season_controller.dart';
 import '../models/season.dart';
-import '../analytics/analytics_service.dart';
 
 final seasonControllerProvider = Provider<SeasonController>((ref) {
-  return SeasonController(analytics: AnalyticsService.instance);
+  return SeasonController();
 });
 
 final currentSeasonProvider = StreamProvider<Season?>((ref) {

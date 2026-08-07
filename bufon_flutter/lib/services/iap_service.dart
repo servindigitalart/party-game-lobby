@@ -1,9 +1,9 @@
 // services/iap_service.dart
 import 'dart:async';
+import '../core/telemetry/game_telemetry_service.dart';
 import 'dart:io';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import '../analytics/analytics_service.dart';
 import '../core/logging/app_logger.dart';
 import '../core/logging/log_category.dart';
 
@@ -20,7 +20,7 @@ class IAPService {
 
   final InAppPurchase _iap = InAppPurchase.instance;
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
-  final AnalyticsService _analytics = AnalyticsService.instance;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
   StreamSubscription<List<PurchaseDetails>>? _subscription;
   bool _isAvailable = false;
@@ -168,12 +168,14 @@ class IAPService {
     );
 
     try {
-      // Analytics: Track purchase initiation
-      await _analytics.logNightPassPurchaseInitiated(
-        roomCode: roomCode,
-        productId: product.id,
-        priceMicros: _getPriceMicros(product),
-        currency: product.currencyCode,
+      _telemetry.track(
+        AppLogCategory.purchases,
+        'purchase_started',
+        payload: {
+          'product_id': product.id,
+          'price_micros': _getPriceMicros(product),
+          'currency': product.currencyCode,
+        },
       );
 
       // Create purchase param
@@ -245,13 +247,14 @@ class IAPService {
           context: {'roomCode': roomCode},
         );
 
-        // Analytics: Track successful purchase
-        await _analytics.logNightPassPurchased(
-          roomCode: roomCode,
-          productId: product.id,
-          purchaseValueMicros: _getPriceMicros(product),
-          currency: product.currencyCode,
-          platform: platform,
+        _telemetry.track(
+          AppLogCategory.purchases,
+          'purchase_completed',
+          payload: {
+            'product_id': product.id,
+            'purchase_value_micros': _getPriceMicros(product),
+            'currency': product.currencyCode,
+          },
         );
 
         // Complete the purchase

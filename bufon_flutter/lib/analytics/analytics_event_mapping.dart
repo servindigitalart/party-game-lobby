@@ -85,7 +85,15 @@ String? _phaseChangedName(TelemetryEvent event) {
 /// Telemetry event name → Firebase Analytics mapping.
 const Map<String, AnalyticsEventMapping> analyticsEventMappings = {
   // --- Session / retention ---
-  'app_started': AnalyticsEventMapping(name: 'app_open'),
+  'app_started': AnalyticsEventMapping(
+    name: 'app_open',
+    parameters: [
+      'days_since_install',
+      'total_sessions',
+      'time_of_day',
+      'is_first_session',
+    ],
+  ),
   'session_started': AnalyticsEventMapping(),
   'session_ended': AnalyticsEventMapping(),
   'app_backgrounded': AnalyticsEventMapping(name: 'app_background'),
@@ -110,9 +118,7 @@ const Map<String, AnalyticsEventMapping> analyticsEventMappings = {
   'round_started': AnalyticsEventMapping(),
   'phase_changed': AnalyticsEventMapping(resolveName: _phaseChangedName),
   'answer_submitted': AnalyticsEventMapping(),
-  'vote_submitted': AnalyticsEventMapping(
-    parameters: ['time_to_vote_seconds'],
-  ),
+  'vote_submitted': AnalyticsEventMapping(parameters: ['time_to_vote_seconds']),
 
   // --- Networking ---
   'players_timed_out': AnalyticsEventMapping(
@@ -133,6 +139,99 @@ const Map<String, AnalyticsEventMapping> analyticsEventMappings = {
   'victory_card_shared': AnalyticsEventMapping(
     parameters: ['votes_received', 'round_wins'],
   ),
+  'profile_viewed': AnalyticsEventMapping(
+    parameters: ['is_own_profile', 'has_title'],
+  ),
+  'profile_shared': AnalyticsEventMapping(parameters: ['has_title', 'level']),
+
+  // --- Progression ---
+  'xp_awarded': AnalyticsEventMapping(
+    parameters: ['xp_amount', 'reason', 'new_level', 'level_up'],
+  ),
+  'level_up': AnalyticsEventMapping(parameters: ['new_level', 'total_xp']),
+  'game_completed': AnalyticsEventMapping(
+    parameters: [
+      'xp_gained',
+      'is_winner',
+      'votes_received',
+      'total_games',
+      'total_wins',
+    ],
+  ),
+  'achievement_unlocked': AnalyticsEventMapping(
+    parameters: ['achievement_id', 'xp_reward'],
+  ),
+  'avatar_unlocked': AnalyticsEventMapping(
+    parameters: ['avatar_id', 'unlock_method'],
+  ),
+  'avatar_selected': AnalyticsEventMapping(parameters: ['avatar_id']),
+  'title_unlocked': AnalyticsEventMapping(
+    parameters: ['title_id', 'rarity', 'source'],
+  ),
+  'title_equipped': AnalyticsEventMapping(parameters: ['title_id', 'rarity']),
+
+  // --- Seasons ---
+  'season_started': AnalyticsEventMapping(parameters: ['season_id']),
+  'season_ended': AnalyticsEventMapping(parameters: ['season_id']),
+  'season_reward_granted': AnalyticsEventMapping(
+    parameters: ['season_id', 'rank', 'reward'],
+  ),
+  'season_rank_achieved': AnalyticsEventMapping(
+    parameters: ['season_id', 'rank', 'total_xp'],
+  ),
+  'season_viewed': AnalyticsEventMapping(
+    parameters: ['season_id', 'days_remaining'],
+  ),
+
+  // --- Leaderboards ---
+  'leaderboards_updated': AnalyticsEventMapping(
+    parameters: ['xp_gained', 'wins_gained', 'votes_gained'],
+  ),
+  'leaderboard_viewed': AnalyticsEventMapping(
+    parameters: ['type', 'entries_count'],
+  ),
+  'leaderboard_rank_achieved': AnalyticsEventMapping(
+    parameters: ['type', 'rank', 'stat_value'],
+  ),
+
+  // --- Monetization ---
+  'paywall_shown': AnalyticsEventMapping(
+    parameters: ['games_played_today', 'trigger_reason'],
+  ),
+  'rewarded_ad_started': AnalyticsEventMapping(
+    parameters: ['ad_network', 'games_played_today'],
+  ),
+  'rewarded_ad_completed': AnalyticsEventMapping(
+    // The SDK reports failure through the same callback path, so this event
+    // carries both outcomes rather than being duplicated.
+    failureName: 'rewarded_ad_failed',
+    parameters: ['ad_network', 'reward_amount', 'failure_reason'],
+  ),
+  'purchase_started': AnalyticsEventMapping(
+    parameters: ['product_id', 'price_micros', 'currency'],
+  ),
+  'purchase_completed': AnalyticsEventMapping(
+    failureName: 'purchase_failed',
+    parameters: [
+      'product_id',
+      'purchase_value_micros',
+      'currency',
+      'failure_reason',
+    ],
+  ),
+  'purchase_restored': AnalyticsEventMapping(parameters: ['product_id']),
+  'purchase_cancelled': AnalyticsEventMapping(parameters: ['product_id']),
+
+  // --- Retention ---
+  'returned_same_day': AnalyticsEventMapping(
+    parameters: ['hours_since_last_session'],
+  ),
+  'returned_next_day': AnalyticsEventMapping(
+    parameters: ['hours_since_last_session'],
+  ),
+  'returned_after_week': AnalyticsEventMapping(
+    parameters: ['days_since_last_session'],
+  ),
 };
 
 /// Session Context keys forwarded as analytics parameters on every event.
@@ -147,6 +246,9 @@ const List<String> analyticsContextKeys = [
   TelemetryKeys.playerCount,
   TelemetryKeys.round,
   TelemetryKeys.platform,
+  // Set only for the moment `session_ended` is emitted, so in practice it
+  // appears on that event alone.
+  TelemetryKeys.sessionDurationSeconds,
 ];
 
 /// Context key whose value is hashed rather than sent verbatim, because

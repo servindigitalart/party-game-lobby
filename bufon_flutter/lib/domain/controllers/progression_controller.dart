@@ -1,9 +1,9 @@
 // domain/controllers/progression_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
 import '../../models/user_profile.dart';
 import '../../models/achievement.dart';
 import '../../models/avatar.dart';
-import '../../analytics/analytics_service.dart';
 import '../../core/exceptions.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/logging/log_category.dart';
@@ -23,7 +23,7 @@ import 'title_controller.dart';
 /// - Update leaderboards after game completion
 class ProgressionController {
   final FirebaseFirestore _firestore;
-  final AnalyticsService _analytics = AnalyticsService.instance;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
   final LeaderboardController? _leaderboardController;
   final TitleController? _titleController;
 
@@ -105,17 +105,24 @@ class ProgressionController {
         transaction.set(docRef, {...profile.toJson(), ...updates});
       }
 
-      // Track analytics
-      await _analytics.logXpAwarded(
-        xpAmount: xpAmount,
-        reason: reason,
-        newXp: newXp,
-        newLevel: newLevel,
-        levelUp: didLevelUp,
+      _telemetry.track(
+        AppLogCategory.progression,
+        'xp_awarded',
+        payload: {
+          'xp_amount': xpAmount,
+          'reason': reason,
+          'new_xp': newXp,
+          'new_level': newLevel,
+          'level_up': didLevelUp,
+        },
       );
 
       if (didLevelUp) {
-        await _analytics.logLevelUp(newLevel: newLevel, totalXp: newXp);
+        _telemetry.track(
+          AppLogCategory.progression,
+          'level_up',
+          payload: {'new_level': newLevel, 'total_xp': newXp},
+        );
       }
 
       return profile.copyWith(
@@ -176,13 +183,16 @@ class ProgressionController {
         transaction.set(docRef, {...profile.toJson(), ...updates});
       }
 
-      // Track analytics
-      await _analytics.logGameCompleted(
-        xpGained: xpGained,
-        isWinner: isWinner,
-        votesReceived: votesReceived,
-        newTotalGames: newTotalGames,
-        newTotalWins: newTotalWins,
+      _telemetry.track(
+        AppLogCategory.progression,
+        'game_completed',
+        payload: {
+          'xp_gained': xpGained,
+          'is_winner': isWinner,
+          'votes_received': votesReceived,
+          'total_games': newTotalGames,
+          'total_wins': newTotalWins,
+        },
       );
 
       return profile.copyWith(
@@ -263,11 +273,14 @@ class ProgressionController {
         'level': newLevel,
       });
 
-      // Track analytics for each achievement
       for (final achievementId in newlyUnlocked) {
-        await _analytics.logAchievementUnlocked(
-          achievementId: achievementId,
-          xpReward: Achievements.getById(achievementId)?.xpReward ?? 0,
+        _telemetry.track(
+          AppLogCategory.progression,
+          'achievement_unlocked',
+          payload: {
+            'achievement_id': achievementId,
+            'xp_reward': Achievements.getById(achievementId)?.xpReward ?? 0,
+          },
         );
       }
 
@@ -340,11 +353,16 @@ class ProgressionController {
           (a) => a.id == avatarId,
           orElse: () => Avatars.all.first,
         );
-        await _analytics.logAvatarUnlocked(
-          avatarId: avatarId,
-          unlockMethod: avatar.requirementType == UnlockRequirement.nightPass
-              ? 'night_pass'
-              : 'progression',
+        _telemetry.track(
+          AppLogCategory.progression,
+          'avatar_unlocked',
+          payload: {
+            'avatar_id': avatarId,
+            'unlock_method':
+                avatar.requirementType == UnlockRequirement.nightPass
+                ? 'night_pass'
+                : 'progression',
+          },
         );
       }
 
@@ -390,7 +408,11 @@ class ProgressionController {
 
       transaction.update(docRef, updates);
 
-      await _analytics.logNightPassAvatarUnlocked();
+      _telemetry.track(
+        AppLogCategory.progression,
+        'avatar_unlocked',
+        payload: {'unlock_method': 'night_pass'},
+      );
     });
   }
 
@@ -417,7 +439,11 @@ class ProgressionController {
 
       transaction.update(docRef, {'selectedAvatar': avatarId});
 
-      await _analytics.logAvatarSelected(avatarId: avatarId);
+      _telemetry.track(
+        AppLogCategory.progression,
+        'avatar_selected',
+        payload: {'avatar_id': avatarId},
+      );
     });
   }
 

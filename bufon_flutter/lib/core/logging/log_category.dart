@@ -23,6 +23,9 @@ enum AppLogCategory {
   monetization,
   ads,
   ui,
+  progression,
+  season,
+  leaderboard,
   unknown,
 }
 
@@ -66,6 +69,12 @@ extension AppLogCategoryLabel on AppLogCategory {
         return 'Ads';
       case AppLogCategory.ui:
         return 'UI';
+      case AppLogCategory.progression:
+        return 'Progression';
+      case AppLogCategory.season:
+        return 'Season';
+      case AppLogCategory.leaderboard:
+        return 'Leaderboard';
       case AppLogCategory.unknown:
         return 'Unknown';
     }
