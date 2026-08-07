@@ -15,7 +15,6 @@ import '../presentation/widgets/share_victory_card.dart';
 import '../presentation/navigation/page_transitions.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
-import '../analytics/analytics_service.dart';
 import '../core/telemetry/game_telemetry_service.dart';
 import '../core/logging/log_category.dart';
 import '../core/logging/log_level.dart';
@@ -43,7 +42,6 @@ class FinalWinnerScreen extends StatefulWidget {
 
 class _FinalWinnerScreenState extends State<FinalWinnerScreen>
     with TickerProviderStateMixin {
-  final _analytics = AnalyticsService.instance;
   final GlobalKey _cardKey = GlobalKey();
   bool _isSharing = false;
   bool _showConfetti = false;
@@ -56,7 +54,6 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
   void initState() {
     super.initState();
 
-    _analytics.trackScreenView('FinalWinnerScreen');
     GameTelemetryService.instance.transition('final_winner');
 
     _scaleController = AnimationController(
@@ -348,9 +345,13 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
         XFile(file.path),
       ], text: '¡Soy el Bufón de la Noche! 🏆');
 
-      await _analytics.logVictoryCardShared(
-        votesReceived: widget.votesReceived,
-        roundWins: widget.totalScore,
+      GameTelemetryService.instance.track(
+        AppLogCategory.ui,
+        'victory_card_shared',
+        payload: {
+          'votes_received': widget.votesReceived,
+          'round_wins': widget.totalScore,
+        },
       );
 
       if (mounted) {

@@ -2,227 +2,89 @@
 
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../core/crash/crash_reporter.dart';
-import '../core/logging/app_logger.dart';
 import '../core/logging/log_category.dart';
+import '../core/telemetry/game_telemetry_service.dart';
 import 'analytics_events.dart';
 
-/// Analytics service for BUFÓN
+/// Remaining analytics surface for features that are not instrumented with
+/// telemetry yet.
 ///
-/// Singleton pattern - use AnalyticsService.instance
-/// Integrates Firebase Analytics and Crashlytics
+/// ## What this is now
 ///
-/// Design principles:
-/// - No direct calls from UI (use controllers/services)
-/// - Events batched automatically by Firebase
-/// - Privacy-first (hash sensitive data)
-/// - Performance-optimized (async, non-blocking)
+/// This class no longer talks to Firebase. `AnalyticsDestination` owns
+/// `FirebaseAnalytics`, and everything here emits a telemetry event that the
+/// destination forwards, so there is exactly one path from an action to
+/// Firebase (docs/telemetry/TELEMETRY_SPEC.md — "One event. Multiple
+/// destinations.").
+///
+/// Every gameplay method is gone: room creation, joins, match start, rounds,
+/// votes and disconnects are emitted by RoomRepository, GameController and
+/// the room listener, and reach Firebase through the destination's registry.
+/// Crash reporting moved to CrashReporter, and screen views to
+/// `GameTelemetryService.transition`.
+///
+/// ## Why it still exists
+///
+/// Two reasons, both temporary:
+///
+/// 1. Progression, seasons, titles, leaderboards, ads and purchases have no
+///    telemetry instrumentation yet. Their events are emitted here under
+///    [AppLogCategory.analytics], which the destination forwards verbatim.
+///    Each one moves into the mapping registry as its feature gets
+///    instrumented properly.
+/// 2. Retention metrics (days since install, session counts, return
+///    windows) are stateful bookkeeping over SharedPreferences, which is
+///    not something telemetry can derive on its own.
 class AnalyticsService {
   AnalyticsService._internal();
   static final AnalyticsService _instance = AnalyticsService._internal();
   static AnalyticsService get instance => _instance;
 
-  FirebaseAnalytics? _analytics;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
+
   SharedPreferences? _prefs;
-
-  // Session tracking
-  DateTime? _sessionStartTime;
-  int _screensVisitedThisSession = 0;
-  int _gamesPlayedThisSession = 0;
-
   bool _isInitialized = false;
 
-  /// Initialize analytics service
-  /// Call this once at app startup
+  /// Loads the local store used for retention bookkeeping.
   Future<void> initialize() async {
     if (_isInitialized) return;
-
-    try {
-      _analytics = FirebaseAnalytics.instance;
-      _prefs = await SharedPreferences.getInstance();
-
-      // Enable analytics collection
-      await _analytics?.setAnalyticsCollectionEnabled(true);
-
-      // Crash reporting and the global error handlers belong to
-      // CrashReporter (docs/engineering/CRASHLYTICS.md — "Only
-      // CrashReporter owns Crashlytics"). This service no longer touches
-      // Crashlytics or FlutterError.onError.
-
-      _isInitialized = true;
-
-      AppLogger.instance.info(
-        AppLogCategory.analytics,
-        'Service initialized',
-      );
-    } catch (e) {
-      AppLogger.instance.error(
-        AppLogCategory.analytics,
-        'Failed to initialize',
-        error: e,
-      );
-    }
-  }
-
-  /// Set user properties for segmentation
-  Future<void> setUserId(String userId) async {
-    if (!_isInitialized) return;
-    await _analytics?.setUserId(id: userId);
-    CrashReporter.instance.setUser(userId);
-  }
-
-  Future<void> setUserProperty(String name, String value) async {
-    if (!_isInitialized) return;
-    await _analytics?.setUserProperty(name: name, value: value);
+    _prefs = await SharedPreferences.getInstance();
+    _isInitialized = true;
   }
 
   // ==========================================================================
-  // GAMEPLAY EVENTS
+  // RETENTION
   // ==========================================================================
 
-  Future<void> logGameCreated({required String roomCode}) async {
-    await _logEvent(
-      AnalyticsEvents.gameCreated,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.playerCount: 1,
-      },
-    );
-  }
+  /// Returns the retention metrics for this launch and records any return
+  /// window that was crossed.
+  ///
+  /// The caller attaches the result to the `app_started` telemetry event, so
+  /// one launch produces one analytics event rather than the `app_open` plus
+  /// `session_started` pair this class used to emit alongside telemetry's own.
+  Future<Map<String, dynamic>> readLaunchMetrics() async {
+    if (!_isInitialized) return const {};
 
-  Future<void> logGameJoined({
-    required String roomCode,
-    required int playerCount,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.gameJoined,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.playerCount: playerCount,
-      },
-    );
-  }
+    final daysSinceInstall = await _daysSinceInstall();
+    final totalSessions = await _incrementTotalSessions();
 
-  Future<void> logGameStarted({
-    required String roomCode,
-    required int playerCount,
-    required int totalRounds,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.gameStarted,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.playerCount: playerCount,
-        AnalyticsParameters.totalRounds: totalRounds,
-      },
+    await _recordReturnWindow();
+    await _prefs?.setInt(
+      'last_session_start',
+      DateTime.now().millisecondsSinceEpoch,
     );
 
-    _gamesPlayedThisSession++;
-  }
-
-  Future<void> logRoundStarted({
-    required String roomCode,
-    required int roundNumber,
-    required int playerCount,
-    String? questionText,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.roundStarted,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.roundNumber: roundNumber,
-        AnalyticsParameters.playerCount: playerCount,
-        if (questionText != null)
-          AnalyticsParameters.questionTextHash: _hashString(questionText),
-      },
-    );
-  }
-
-  Future<void> logRoundCompleted({
-    required String roomCode,
-    required int roundNumber,
-    required int roundDurationSeconds,
-    required int votesSubmitted,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.roundCompleted,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.roundNumber: roundNumber,
-        AnalyticsParameters.roundDurationSeconds: roundDurationSeconds,
-        AnalyticsParameters.votesSubmitted: votesSubmitted,
-      },
-    );
-  }
-
-  Future<void> logVoteSubmitted({
-    required String roomCode,
-    required int roundNumber,
-    required int timeToVoteSeconds,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.voteSubmitted,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.roundNumber: roundNumber,
-        AnalyticsParameters.timeToVoteSeconds: timeToVoteSeconds,
-      },
-    );
-  }
-
-  Future<void> logPlayerDisconnected({
-    required String roomCode,
-    required int playerCountRemaining,
-    required String gamePhase,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.playerDisconnected,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.playerCountRemaining: playerCountRemaining,
-        AnalyticsParameters.gamePhase: gamePhase,
-      },
-    );
-  }
-
-  Future<void> logGameFinished({
-    required String roomCode,
-    required int totalRounds,
-    required int totalDurationSeconds,
-    required int finalPlayerCount,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.gameFinished,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.totalRounds: totalRounds,
-        AnalyticsParameters.gameDurationSeconds: totalDurationSeconds,
-        AnalyticsParameters.finalPlayerCount: finalPlayerCount,
-      },
-    );
-  }
-
-  Future<void> logWinnerDeclared({
-    required String roomCode,
-    required int winningScore,
-    required int totalPlayers,
-    bool wasTiebreaker = false,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.winnerDeclared,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.winningScore: winningScore,
-        AnalyticsParameters.totalPlayers: totalPlayers,
-        AnalyticsParameters.wasTiebreaker: wasTiebreaker,
-      },
-    );
+    return {
+      AnalyticsParameters.daysSinceInstall: daysSinceInstall,
+      AnalyticsParameters.totalSessions: totalSessions,
+      AnalyticsParameters.timeOfDay: _timeOfDay(),
+      AnalyticsParameters.isFirstSession: totalSessions <= 1,
+    };
   }
 
   // ==========================================================================
-  // MONETIZATION EVENTS
+  // MONETIZATION
   // ==========================================================================
 
   Future<void> logPaywallShown({
@@ -230,10 +92,9 @@ class AnalyticsService {
     required int gamesPlayedToday,
     required String triggerReason,
   }) async {
-    await _logEvent(
+    _emit(
       AnalyticsEvents.paywallShown,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
+      {
         AnalyticsParameters.gamesPlayedToday: gamesPlayedToday,
         AnalyticsParameters.triggerReason: triggerReason,
       },
@@ -245,14 +106,10 @@ class AnalyticsService {
     required int gamesPlayedToday,
     String adNetwork = 'admob',
   }) async {
-    await _logEvent(
-      AnalyticsEvents.rewardedAdWatched,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.adNetwork: adNetwork,
-        AnalyticsParameters.gamesPlayedToday: gamesPlayedToday,
-      },
-    );
+    _emit(AnalyticsEvents.rewardedAdWatched, {
+      AnalyticsParameters.adNetwork: adNetwork,
+      AnalyticsParameters.gamesPlayedToday: gamesPlayedToday,
+    });
   }
 
   Future<void> logRewardedAdCompleted({
@@ -261,15 +118,11 @@ class AnalyticsService {
     required int timeToCompleteSeconds,
     String adNetwork = 'admob',
   }) async {
-    await _logEvent(
-      AnalyticsEvents.rewardedAdCompleted,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.adNetwork: adNetwork,
-        AnalyticsParameters.rewardAmount: rewardAmount,
-        AnalyticsParameters.timeToCompleteSeconds: timeToCompleteSeconds,
-      },
-    );
+    _emit(AnalyticsEvents.rewardedAdCompleted, {
+      AnalyticsParameters.adNetwork: adNetwork,
+      AnalyticsParameters.rewardAmount: rewardAmount,
+      AnalyticsParameters.timeToCompleteSeconds: timeToCompleteSeconds,
+    });
   }
 
   Future<void> logRewardedAdFailed({
@@ -277,14 +130,10 @@ class AnalyticsService {
     required String failureReason,
     String adNetwork = 'admob',
   }) async {
-    await _logEvent(
-      AnalyticsEvents.rewardedAdFailed,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.adNetwork: adNetwork,
-        AnalyticsParameters.failureReason: failureReason,
-      },
-    );
+    _emit(AnalyticsEvents.rewardedAdFailed, {
+      AnalyticsParameters.adNetwork: adNetwork,
+      AnalyticsParameters.failureReason: failureReason,
+    });
   }
 
   Future<void> logNightPassPurchaseInitiated({
@@ -293,15 +142,11 @@ class AnalyticsService {
     required int priceMicros,
     required String currency,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.nightPassPurchaseInitiated,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.productId: productId,
-        AnalyticsParameters.priceMicros: priceMicros,
-        AnalyticsParameters.currency: currency,
-      },
-    );
+    _emit(AnalyticsEvents.nightPassPurchaseInitiated, {
+      AnalyticsParameters.productId: productId,
+      AnalyticsParameters.priceMicros: priceMicros,
+      AnalyticsParameters.currency: currency,
+    });
   }
 
   Future<void> logNightPassPurchased({
@@ -311,16 +156,12 @@ class AnalyticsService {
     required String currency,
     required String platform,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.nightPassPurchased,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.productId: productId,
-        AnalyticsParameters.purchaseValueMicros: purchaseValueMicros,
-        AnalyticsParameters.currency: currency,
-        AnalyticsParameters.platform: platform,
-      },
-    );
+    _emit(AnalyticsEvents.nightPassPurchased, {
+      AnalyticsParameters.productId: productId,
+      AnalyticsParameters.purchaseValueMicros: purchaseValueMicros,
+      AnalyticsParameters.currency: currency,
+      AnalyticsParameters.platform: platform,
+    });
   }
 
   Future<void> logNightPassActivated({
@@ -328,263 +169,14 @@ class AnalyticsService {
     required bool activatedBySelf,
     required DateTime expiresAt,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.nightPassActivated,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.activatedBySelf: activatedBySelf,
-        AnalyticsParameters.expiresAt: expiresAt.millisecondsSinceEpoch ~/ 1000,
-      },
-    );
-  }
-
-  Future<void> logGameBlockedByLimit({
-    required String roomCode,
-    required int gamesPlayedToday,
-    required int bonusGamesRemaining,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.gameBlockedByLimit,
-      parameters: {
-        AnalyticsParameters.roomCodeHash: _hashString(roomCode),
-        AnalyticsParameters.gamesPlayedToday: gamesPlayedToday,
-        AnalyticsParameters.bonusGamesRemaining: bonusGamesRemaining,
-      },
-    );
+    _emit(AnalyticsEvents.nightPassActivated, {
+      AnalyticsParameters.activatedBySelf: activatedBySelf,
+      AnalyticsParameters.expiresAt: expiresAt.millisecondsSinceEpoch ~/ 1000,
+    });
   }
 
   // ==========================================================================
-  // RETENTION EVENTS
-  // ==========================================================================
-
-  Future<void> logAppOpened() async {
-    final daysSinceInstall = await _getDaysSinceInstall();
-    final totalSessions = await _incrementTotalSessions();
-
-    await _logEvent(
-      AnalyticsEvents.appOpened,
-      parameters: {
-        AnalyticsParameters.daysSinceInstall: daysSinceInstall,
-        AnalyticsParameters.totalSessions: totalSessions,
-      },
-    );
-
-    // Check for returning users
-    await _checkReturnStatus();
-  }
-
-  Future<void> logSessionStarted() async {
-    _sessionStartTime = DateTime.now();
-    _screensVisitedThisSession = 0;
-    _gamesPlayedThisSession = 0;
-
-    final isFirstSession = await _isFirstSession();
-    final timeOfDay = _getTimeOfDay();
-
-    await _logEvent(
-      AnalyticsEvents.sessionStarted,
-      parameters: {
-        AnalyticsParameters.timeOfDay: timeOfDay,
-        AnalyticsParameters.isFirstSession: isFirstSession ? 1 : 0,
-      },
-    );
-
-    // Update last session time
-    await _prefs?.setInt(
-      'last_session_start',
-      DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
-  Future<void> logSessionEnded() async {
-    if (_sessionStartTime == null) return;
-
-    final sessionDuration = DateTime.now()
-        .difference(_sessionStartTime!)
-        .inSeconds;
-
-    await _logEvent(
-      AnalyticsEvents.sessionEnded,
-      parameters: {
-        AnalyticsParameters.sessionDurationSeconds: sessionDuration,
-        AnalyticsParameters.screensVisited: _screensVisitedThisSession,
-        AnalyticsParameters.gamesPlayed: _gamesPlayedThisSession,
-      },
-    );
-
-    _sessionStartTime = null;
-  }
-
-  void trackScreenView(String screenName) {
-    _screensVisitedThisSession++;
-    _analytics?.logScreenView(screenName: screenName);
-  }
-
-  // ==========================================================================
-  // QUALITY EVENTS
-  // ==========================================================================
-
-  Future<void> logGameplayError({
-    required String errorType,
-    required String errorPhase,
-    bool isRecoverable = true,
-    StackTrace? stackTrace,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.gameplayError,
-      parameters: {
-        AnalyticsParameters.errorType: errorType,
-        AnalyticsParameters.errorPhase: errorPhase,
-        AnalyticsParameters.isRecoverable: isRecoverable,
-      },
-    );
-
-    // Also report non-recoverable failures as a crash.
-    if (!isRecoverable) {
-      CrashReporter.instance.recordNonFatal(
-        Exception(errorType),
-        stackTrace: stackTrace,
-        category: AppLogCategory.gameplay,
-        reason: 'Gameplay error in $errorPhase',
-      );
-    }
-  }
-
-  Future<void> logHighLatency({
-    required int latencyMs,
-    required String actionType,
-  }) async {
-    if (latencyMs < 1000) return; // Only log if > 1 second
-
-    await _logEvent(
-      AnalyticsEvents.highLatency,
-      parameters: {
-        AnalyticsParameters.latencyMs: latencyMs,
-        AnalyticsParameters.actionType: actionType,
-      },
-    );
-  }
-
-  Future<void> logFeedbackSubmitted({
-    required String feedbackType,
-    required int rating,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.feedbackSubmitted,
-      parameters: {
-        AnalyticsParameters.feedbackType: feedbackType,
-        AnalyticsParameters.rating: rating,
-      },
-    );
-  }
-
-  // ==========================================================================
-  // PRIVATE HELPERS
-  // ==========================================================================
-
-  Future<void> _logEvent(String name, {Map<String, Object>? parameters}) async {
-    if (!_isInitialized) return;
-
-    try {
-      await _analytics?.logEvent(name: name, parameters: parameters);
-
-      AppLogger.instance.debug(
-        AppLogCategory.analytics,
-        'Event: $name',
-        context: parameters,
-      );
-    } catch (e) {
-      AppLogger.instance.error(
-        AppLogCategory.analytics,
-        'Failed to log event $name',
-        error: e,
-      );
-    }
-  }
-
-  /// Hash sensitive data for privacy
-  String _hashString(String input) {
-    final bytes = utf8.encode(input);
-    final digest = sha256.convert(bytes);
-    return digest.toString().substring(0, 16); // First 16 chars
-  }
-
-  String _hashUserId(String userId) {
-    return _hashString(userId);
-  }
-
-  /// Get days since first install
-  Future<int> _getDaysSinceInstall() async {
-    final installTime = _prefs?.getInt('first_install_time');
-    if (installTime == null) {
-      // First install
-      await _prefs?.setInt(
-        'first_install_time',
-        DateTime.now().millisecondsSinceEpoch,
-      );
-      return 0;
-    }
-
-    final installDate = DateTime.fromMillisecondsSinceEpoch(installTime);
-    return DateTime.now().difference(installDate).inDays;
-  }
-
-  /// Increment and return total sessions
-  Future<int> _incrementTotalSessions() async {
-    final current = _prefs?.getInt('total_sessions') ?? 0;
-    final newTotal = current + 1;
-    await _prefs?.setInt('total_sessions', newTotal);
-    return newTotal;
-  }
-
-  /// Check if this is the first session
-  Future<bool> _isFirstSession() async {
-    final totalSessions = _prefs?.getInt('total_sessions') ?? 0;
-    return totalSessions <= 1;
-  }
-
-  /// Get time of day category
-  String _getTimeOfDay() {
-    final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return 'morning';
-    if (hour >= 12 && hour < 17) return 'afternoon';
-    if (hour >= 17 && hour < 21) return 'evening';
-    return 'night';
-  }
-
-  /// Check if user is returning and log appropriate event
-  Future<void> _checkReturnStatus() async {
-    final lastSession = _prefs?.getInt('last_session_start');
-    if (lastSession == null) return;
-
-    final lastSessionTime = DateTime.fromMillisecondsSinceEpoch(lastSession);
-    final now = DateTime.now();
-    final hoursSince = now.difference(lastSessionTime).inHours;
-    final daysSince = now.difference(lastSessionTime).inDays;
-
-    if (daysSince >= 7) {
-      // Returned after a week
-      await _logEvent(
-        AnalyticsEvents.returnedAfterWeek,
-        parameters: {AnalyticsParameters.daysSinceLastSession: daysSince},
-      );
-    } else if (daysSince == 1) {
-      // Next day return (D1 retention)
-      await _logEvent(
-        AnalyticsEvents.returnedNextDay,
-        parameters: {AnalyticsParameters.hoursSinceLastSession: hoursSince},
-      );
-    } else if (daysSince == 0 && hoursSince >= 1) {
-      // Same day return
-      await _logEvent(
-        AnalyticsEvents.returnedSameDay,
-        parameters: {AnalyticsParameters.hoursSinceLastSession: hoursSince},
-      );
-    }
-  }
-
-  // ==========================================================================
-  // PROGRESSION ANALYTICS (Phase 3)
+  // PROGRESSION
   // ==========================================================================
 
   Future<void> logXpAwarded({
@@ -594,23 +186,20 @@ class AnalyticsService {
     required int newLevel,
     required bool levelUp,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.xpAwarded,
-      parameters: {
-        'xp_amount': xpAmount,
-        'reason': reason,
-        'new_xp': newXp,
-        'new_level': newLevel,
-        'level_up': levelUp,
-      },
-    );
+    _emit(AnalyticsEvents.xpAwarded, {
+      'xp_amount': xpAmount,
+      'reason': reason,
+      'new_xp': newXp,
+      'new_level': newLevel,
+      'level_up': levelUp,
+    });
   }
 
   Future<void> logLevelUp({required int newLevel, required int totalXp}) async {
-    await _logEvent(
-      AnalyticsEvents.levelUp,
-      parameters: {'new_level': newLevel, 'total_xp': totalXp},
-    );
+    _emit(AnalyticsEvents.levelUp, {
+      'new_level': newLevel,
+      'total_xp': totalXp,
+    });
   }
 
   Future<void> logGameCompleted({
@@ -620,51 +209,45 @@ class AnalyticsService {
     required int newTotalGames,
     required int newTotalWins,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.gameCompleted,
-      parameters: {
-        'xp_gained': xpGained,
-        'is_winner': isWinner,
-        'votes_received': votesReceived,
-        'new_total_games': newTotalGames,
-        'new_total_wins': newTotalWins,
-      },
-    );
+    _emit(AnalyticsEvents.gameCompleted, {
+      'xp_gained': xpGained,
+      'is_winner': isWinner,
+      'votes_received': votesReceived,
+      'new_total_games': newTotalGames,
+      'new_total_wins': newTotalWins,
+    });
   }
 
   Future<void> logAchievementUnlocked({
     required String achievementId,
     required int xpReward,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.achievementUnlocked,
-      parameters: {'achievement_id': achievementId, 'xp_reward': xpReward},
-    );
+    _emit(AnalyticsEvents.achievementUnlocked, {
+      'achievement_id': achievementId,
+      'xp_reward': xpReward,
+    });
   }
 
   Future<void> logAvatarUnlocked({
     required String avatarId,
     required String unlockMethod,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.avatarUnlocked,
-      parameters: {'avatar_id': avatarId, 'unlock_method': unlockMethod},
-    );
+    _emit(AnalyticsEvents.avatarUnlocked, {
+      'avatar_id': avatarId,
+      'unlock_method': unlockMethod,
+    });
   }
 
   Future<void> logNightPassAvatarUnlocked() async {
-    await _logEvent(AnalyticsEvents.nightPassAvatarUnlocked);
+    _emit(AnalyticsEvents.nightPassAvatarUnlocked, const {});
   }
 
   Future<void> logAvatarSelected({required String avatarId}) async {
-    await _logEvent(
-      AnalyticsEvents.avatarSelected,
-      parameters: {'avatar_id': avatarId},
-    );
+    _emit(AnalyticsEvents.avatarSelected, {'avatar_id': avatarId});
   }
 
   // ==========================================================================
-  // LEADERBOARD ANALYTICS (Phase 3C)
+  // LEADERBOARDS
   // ==========================================================================
 
   Future<void> logLeaderboardsUpdated({
@@ -673,15 +256,12 @@ class AnalyticsService {
     required int votesGained,
     required String weekKey,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.leaderboardsUpdated,
-      parameters: {
-        'xp_gained': xpGained,
-        'wins_gained': winsGained,
-        'votes_gained': votesGained,
-        'week_key': weekKey,
-      },
-    );
+    _emit(AnalyticsEvents.leaderboardsUpdated, {
+      'xp_gained': xpGained,
+      'wins_gained': winsGained,
+      'votes_gained': votesGained,
+      'week_key': weekKey,
+    });
   }
 
   Future<void> logLeaderboardViewed({
@@ -689,14 +269,11 @@ class AnalyticsService {
     String? weekKey,
     required int entriesCount,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.leaderboardViewed,
-      parameters: {
-        'type': type,
-        if (weekKey != null) 'week_key': weekKey,
-        'entries_count': entriesCount,
-      },
-    );
+    _emit(AnalyticsEvents.leaderboardViewed, {
+      'type': type,
+      if (weekKey != null) 'week_key': weekKey,
+      'entries_count': entriesCount,
+    });
   }
 
   Future<void> logLeaderboardRankAchieved({
@@ -705,19 +282,16 @@ class AnalyticsService {
     required int statValue,
     String? weekKey,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.leaderboardRankAchieved,
-      parameters: {
-        'type': type,
-        'rank': rank,
-        'stat_value': statValue,
-        if (weekKey != null) 'week_key': weekKey,
-      },
-    );
+    _emit(AnalyticsEvents.leaderboardRankAchieved, {
+      'type': type,
+      'rank': rank,
+      'stat_value': statValue,
+      if (weekKey != null) 'week_key': weekKey,
+    });
   }
 
   // ==========================================================================
-  // TITLE ANALYTICS (Phase 4A)
+  // TITLES AND PROFILE
   // ==========================================================================
 
   Future<void> logTitleUnlocked({
@@ -726,15 +300,12 @@ class AnalyticsService {
     required String rarity,
     required String source,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.titleUnlocked,
-      parameters: {
-        'title_id': titleId,
-        'title_name': titleName,
-        'rarity': rarity,
-        'source': source,
-      },
-    );
+    _emit(AnalyticsEvents.titleUnlocked, {
+      'title_id': titleId,
+      'title_name': titleName,
+      'rarity': rarity,
+      'source': source,
+    });
   }
 
   Future<void> logTitleEquipped({
@@ -742,68 +313,55 @@ class AnalyticsService {
     required String titleName,
     required String rarity,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.titleEquipped,
-      parameters: {
-        'title_id': titleId,
-        'title_name': titleName,
-        'rarity': rarity,
-      },
-    );
+    _emit(AnalyticsEvents.titleEquipped, {
+      'title_id': titleId,
+      'title_name': titleName,
+      'rarity': rarity,
+    });
   }
 
   Future<void> logProfileViewed({
     required bool isOwnProfile,
     required bool hasTitle,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.profileViewed,
-      parameters: {'is_own_profile': isOwnProfile, 'has_title': hasTitle},
-    );
+    _emit(AnalyticsEvents.profileViewed, {
+      'is_own_profile': isOwnProfile,
+      'has_title': hasTitle,
+    });
   }
 
   Future<void> logProfileShared({
     required bool hasTitle,
     required int level,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.profileShared,
-      parameters: {'has_title': hasTitle, 'level': level},
-    );
-  }
-
-  Future<void> logVictoryCardShared({
-    required int votesReceived,
-    required int roundWins,
-  }) async {
-    await _logEvent(
-      AnalyticsEvents.victoryCardShared,
-      parameters: {'votes_received': votesReceived, 'round_wins': roundWins},
-    );
+    _emit(AnalyticsEvents.profileShared, {
+      'has_title': hasTitle,
+      'level': level,
+    });
   }
 
   // ==========================================================================
-  // SEASONAL EVENTS
+  // SEASONS
   // ==========================================================================
 
   Future<void> logSeasonStarted({
     required String seasonId,
     required String seasonName,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.seasonStarted,
-      parameters: {'season_id': seasonId, 'season_name': seasonName},
-    );
+    _emit(AnalyticsEvents.seasonStarted, {
+      'season_id': seasonId,
+      'season_name': seasonName,
+    });
   }
 
   Future<void> logSeasonEnded({
     required String seasonId,
     required String seasonName,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.seasonEnded,
-      parameters: {'season_id': seasonId, 'season_name': seasonName},
-    );
+    _emit(AnalyticsEvents.seasonEnded, {
+      'season_id': seasonId,
+      'season_name': seasonName,
+    });
   }
 
   Future<void> logSeasonRewardGranted({
@@ -812,15 +370,14 @@ class AnalyticsService {
     required int rank,
     required String reward,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.seasonRewardGranted,
-      parameters: {
-        'season_id': seasonId,
-        'user_id_hash': _hashUserId(userId),
-        'rank': rank,
-        'reward': reward,
-      },
-    );
+    _emit(AnalyticsEvents.seasonRewardGranted, {
+      'season_id': seasonId,
+      // Hashed here rather than in the destination: this is another
+      // player's id, not the current user's.
+      'user_id_hash': _hash(userId),
+      'rank': rank,
+      'reward': reward,
+    });
   }
 
   Future<void> logSeasonRankAchieved({
@@ -828,23 +385,92 @@ class AnalyticsService {
     required int rank,
     required int totalXp,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.seasonRankAchieved,
-      parameters: {'season_id': seasonId, 'rank': rank, 'total_xp': totalXp},
-    );
+    _emit(AnalyticsEvents.seasonRankAchieved, {
+      'season_id': seasonId,
+      'rank': rank,
+      'total_xp': totalXp,
+    });
   }
 
   Future<void> logSeasonViewed({
     required String seasonId,
     required int daysRemaining,
   }) async {
-    await _logEvent(
-      AnalyticsEvents.seasonViewed,
-      parameters: {'season_id': seasonId, 'days_remaining': daysRemaining},
-    );
+    _emit(AnalyticsEvents.seasonViewed, {
+      'season_id': seasonId,
+      'days_remaining': daysRemaining,
+    });
   }
 
   // ==========================================================================
-  // QUALITY & PERFORMANCE
+  // PRIVATE HELPERS
   // ==========================================================================
+
+  /// Emits an analytics-only event.
+  ///
+  /// [AppLogCategory.analytics] is what tells AnalyticsDestination to
+  /// forward it verbatim, since these events have no mapping registry entry
+  /// yet. Room code and player count are not passed: they already travel in
+  /// Session Context and the destination attaches them.
+  void _emit(String name, Map<String, dynamic> parameters) {
+    _telemetry.track(
+      AppLogCategory.analytics,
+      name,
+      payload: parameters,
+    );
+  }
+
+  String _hash(String input) =>
+      sha256.convert(utf8.encode(input)).toString().substring(0, 16);
+
+  Future<int> _daysSinceInstall() async {
+    final installTime = _prefs?.getInt('first_install_time');
+    if (installTime == null) {
+      await _prefs?.setInt(
+        'first_install_time',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      return 0;
+    }
+    return DateTime.now()
+        .difference(DateTime.fromMillisecondsSinceEpoch(installTime))
+        .inDays;
+  }
+
+  Future<int> _incrementTotalSessions() async {
+    final newTotal = (_prefs?.getInt('total_sessions') ?? 0) + 1;
+    await _prefs?.setInt('total_sessions', newTotal);
+    return newTotal;
+  }
+
+  String _timeOfDay() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'morning';
+    if (hour >= 12 && hour < 17) return 'afternoon';
+    if (hour >= 17 && hour < 21) return 'evening';
+    return 'night';
+  }
+
+  Future<void> _recordReturnWindow() async {
+    final lastSession = _prefs?.getInt('last_session_start');
+    if (lastSession == null) return;
+
+    final since = DateTime.now().difference(
+      DateTime.fromMillisecondsSinceEpoch(lastSession),
+    );
+
+    if (since.inDays >= 7) {
+      _emit(AnalyticsEvents.returnedAfterWeek, {
+        AnalyticsParameters.daysSinceLastSession: since.inDays,
+      });
+    } else if (since.inDays == 1) {
+      _emit(AnalyticsEvents.returnedNextDay, {
+        AnalyticsParameters.hoursSinceLastSession: since.inHours,
+      });
+    } else if (since.inDays == 0 && since.inHours >= 1) {
+      _emit(AnalyticsEvents.returnedSameDay, {
+        AnalyticsParameters.hoursSinceLastSession: since.inHours,
+      });
+    }
+  }
 }

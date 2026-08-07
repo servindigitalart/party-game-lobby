@@ -9,7 +9,6 @@ import '../../core/logging/log_category.dart';
 import '../../core/logging/log_level.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import '../../core/telemetry/telemetry_context.dart';
-import '../../analytics/analytics_service.dart';
 
 /// Repository responsible for all Firestore room operations
 /// Uses subcollections for players instead of arrays
@@ -29,7 +28,6 @@ import '../../analytics/analytics_service.dart';
 /// transition is reported twice.
 class RoomRepository {
   final FirebaseFirestore _firestore;
-  final AnalyticsService _analytics = AnalyticsService.instance;
   final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
   RoomRepository({FirebaseFirestore? firestore})
@@ -195,24 +193,19 @@ class RoomRepository {
         });
       });
 
-      // Track vote submission - get round number from room
-      final roomSnapshot = await roomRef.get();
-      final room = Room.fromJson(roomSnapshot.data()!);
-      final timeToVoteSeconds = DateTime.now()
-          .difference(voteStartTime)
-          .inSeconds;
-
-      // Round and room code already travel in Session Context.
+      // Round, room code and player count already travel in Session Context,
+      // refreshed from the room snapshot. Reading the room back from
+      // Firestore here — one extra document read on the hot voting path,
+      // once per player per round — existed only to fill an analytics
+      // parameter and is gone.
       _telemetry.track(
         AppLogCategory.voting,
         'vote_submitted',
-        payload: {'time_to_vote_seconds': timeToVoteSeconds},
-      );
-
-      await _analytics.logVoteSubmitted(
-        roomCode: roomCode,
-        roundNumber: room.currentRound,
-        timeToVoteSeconds: timeToVoteSeconds,
+        payload: {
+          'time_to_vote_seconds': DateTime.now()
+              .difference(voteStartTime)
+              .inSeconds,
+        },
       );
     } on FirebaseException catch (e) {
       throw RoomException(
@@ -355,54 +348,11 @@ class RoomRepository {
     _lastHostId = null;
   }
 
-  /// Update room phase
-  Future<void> updatePhase(String roomCode, GamePhase phase) async {
-    final oldPhase = await _getCurrentPhase(roomCode);
-
-    await _write(
-      'update_phase',
-      () => _firestore.collection('rooms').doc(roomCode).update({
-        'phase': phase.name,
-      }),
-    );
-
-    // Track phase transitions for analytics
-    final room = await getRoom(roomCode);
-    if (room != null) {
-      if (phase == GamePhase.answering && oldPhase != GamePhase.answering) {
-        // New round started
-        await _analytics.logRoundStarted(
-          roomCode: roomCode,
-          roundNumber: room.currentRound,
-          playerCount: room.players.length,
-        );
-      } else if (phase == GamePhase.roundResult &&
-          oldPhase == GamePhase.voting) {
-        // Round completed - calculate votes submitted
-        final votesSubmitted = room.players
-            .where((p) => p.votedFor != null)
-            .length;
-
-        await _analytics.logRoundCompleted(
-          roomCode: roomCode,
-          roundNumber: room.currentRound,
-          roundDurationSeconds: 0, // Could be tracked with round start time
-          votesSubmitted: votesSubmitted,
-        );
-      }
-    }
-  }
-
-  /// Helper to get current phase before updating
-  Future<GamePhase?> _getCurrentPhase(String roomCode) async {
-    final roomDoc = await _firestore.collection('rooms').doc(roomCode).get();
-    if (!roomDoc.exists) return null;
-    final data = roomDoc.data();
-    if (data == null) return null;
-    final phaseName = data['phase'] as String?;
-    if (phaseName == null) return null;
-    return GamePhase.values.firstWhere((p) => p.name == phaseName);
-  }
+  // `updatePhase` and `_getCurrentPhase` were removed here. They had no
+  // callers anywhere in the app, and between them performed three Firestore
+  // reads (the room doc twice plus the players subcollection) purely to fill
+  // analytics parameters for round transitions. Those transitions are now
+  // derived from the room snapshot in `watchRoom`, at no read cost.
 
   /// Update entire room (use sparingly, prefer field-level updates)
   Future<void> updateRoom(Room room) async {
@@ -902,20 +852,10 @@ class RoomRepository {
       }
 
       // Track disconnections outside transaction
-      if (result != null) {
-        // Count disconnected players by comparing before/after
-        final currentPlayerCount = result.players.length;
-        final roomSnapshot = await roomRef.get();
-        final roomData = roomSnapshot.data()!;
-
-        // Log each disconnection event
-        await _analytics.logPlayerDisconnected(
-          roomCode: roomCode,
-          playerCountRemaining: currentPlayerCount,
-          gamePhase: roomData['phase'] as String? ?? 'unknown',
-        );
-      }
-
+      // The phase and remaining player count used to be re-read from
+      // Firestore here just to fill analytics parameters. Both already ride
+      // in Session Context via the room listener, so `players_timed_out`
+      // above carries them for free.
       return result;
     } on FirebaseException catch (e) {
       throw RoomException(

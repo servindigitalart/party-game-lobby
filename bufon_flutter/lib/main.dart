@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'analytics/analytics_destination.dart';
 import 'analytics/analytics_service.dart';
 import 'core/crash/crash_reporter.dart';
 import 'core/crash/firebase_crashlytics_backend.dart';
@@ -36,8 +37,6 @@ void main() {
     // become crash breadcrumbs automatically.
     final telemetry = GameTelemetryService.instance;
     telemetry.init();
-    telemetry.startSession();
-    telemetry.track(AppLogCategory.app, 'app_started');
 
     // Set system UI overlay style for dark theme
     SystemChrome.setSystemUIOverlayStyle(
@@ -63,13 +62,27 @@ void main() {
     // Crashlytics is usable now; this flushes anything buffered above.
     await CrashReporter.instance.attachBackend(FirebaseCrashlyticsBackend());
 
+    // Firebase Analytics is just another destination: register it and it
+    // starts receiving telemetry events with no gameplay code involved.
+    final analyticsDestination = AnalyticsDestination();
+    await analyticsDestination.initialize();
+    AppLogger.instance.registerDestination(analyticsDestination);
+
     // Initialize Mobile Ads SDK
     await MobileAds.instance.initialize();
 
-    // Initialize Analytics
+    // The session opens only once the analytics destination is listening;
+    // emitting earlier would keep the crash breadcrumb but silently drop the
+    // session and launch events, which are the base of every retention
+    // funnel. Crash context is unaffected — device context is already set by
+    // telemetry.init() above, and there is no room yet at this point.
     await AnalyticsService.instance.initialize();
-    await AnalyticsService.instance.logAppOpened();
-    await AnalyticsService.instance.logSessionStarted();
+    telemetry.startSession();
+    telemetry.track(
+      AppLogCategory.app,
+      'app_started',
+      payload: await AnalyticsService.instance.readLaunchMetrics(),
+    );
 
     runApp(const ProviderScope(child: MyApp()));
   });

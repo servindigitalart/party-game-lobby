@@ -9,7 +9,6 @@ import '../providers/game_providers.dart';
 import '../core/telemetry/game_telemetry_service.dart';
 import '../core/exceptions.dart';
 import '../core/game_copy.dart';
-import '../analytics/analytics_service.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
@@ -188,7 +187,6 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
     final userId = ref.watch(userIdProvider);
 
     // Track screen view (only once per build with different room)
-    AnalyticsService.instance.trackScreenView('VotingScreen');
 
     return roomAsync.when(
       data: (room) {

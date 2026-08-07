@@ -9,7 +9,6 @@ import '../../core/logging/log_category.dart';
 import '../../core/logging/log_level.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import '../../core/telemetry/telemetry_context.dart';
-import '../../analytics/analytics_service.dart';
 
 /// High-level controller for game operations
 ///
@@ -20,7 +19,6 @@ import '../../analytics/analytics_service.dart';
 class GameController {
   final FirebaseService _firebaseService;
   final RoomRepository _roomRepository;
-  final AnalyticsService _analytics = AnalyticsService.instance;
   final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
   GameController(this._firebaseService, this._roomRepository);
@@ -79,9 +77,6 @@ class GameController {
     });
     operation.finish(payload: {'attempts': attempts});
 
-    // Analytics: Track game creation
-    await _analytics.logGameCreated(roomCode: room.code);
-
     return room;
   }
 
@@ -108,11 +103,6 @@ class GameController {
     });
     operation.finish();
 
-    await _analytics.logGameJoined(
-      roomCode: room.code,
-      playerCount: room.players.length,
-    );
-
     return room;
   }
 
@@ -127,17 +117,11 @@ class GameController {
     if (!canStart) {
       // A hard product gate, not a failure: recorded as a normal event so
       // the funnel shows where matches stop happening.
+      //
+      // This used to re-read the room (one document plus the players
+      // subcollection) only to fill gamesPlayedToday/adUnlocksRemaining for
+      // an analytics parameter. The event now relies on Session Context.
       _telemetry.track(AppLogCategory.monetization, 'match_blocked_by_limit');
-
-      // Analytics: Track blocked game
-      final roomData = await _roomRepository.getRoom(roomCode);
-      if (roomData != null) {
-        await _analytics.logGameBlockedByLimit(
-          roomCode: roomCode,
-          gamesPlayedToday: roomData.gamesPlayedToday,
-          bonusGamesRemaining: roomData.adUnlocksRemaining,
-        );
-      }
 
       throw MonetizationException(
         'La sala ha alcanzado el límite de 3 partidas diarias. '

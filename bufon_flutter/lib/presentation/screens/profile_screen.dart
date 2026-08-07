@@ -1,5 +1,6 @@
 // presentation/screens/profile_screen.dart
 import 'package:flutter/material.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -9,7 +10,6 @@ import '../../models/avatar.dart';
 import '../../providers/progression_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/haptic_service.dart';
-import '../../analytics/analytics_service.dart';
 import 'profile_public_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -21,14 +21,13 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen>
     with SingleTickerProviderStateMixin {
-  final _analytics = AnalyticsService.instance;
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _analytics.trackScreenView('ProfileScreen');
+    GameTelemetryService.instance.transition('profile');
   }
 
   @override

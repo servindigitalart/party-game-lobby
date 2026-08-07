@@ -334,11 +334,22 @@ Circular dependencies.
 
 # Analytics
 
+Firebase Analytics is a destination, not a service features call.
+
+`AnalyticsDestination` (`lib/analytics/`) consumes telemetry events from
+AppLogger and translates them through a mapping registry. It is the only file
+importing `firebase_analytics`.
+
+Gameplay emits one telemetry event; Talker, CrashReporter and Firebase
+Analytics all consume that same event.
+
 Analytics must never modify business logic.
 
 Logging must never change app behavior.
 
 Telemetry is passive.
+
+See docs/engineering/ANALYTICS.md.
 
 ---
 

@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../analytics/analytics_service.dart';
 import '../core/game_copy.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
@@ -120,7 +119,6 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
     final roomAsync = ref.watch(roomStreamProvider);
     final userId = ref.watch(userIdProvider);
 
-    AnalyticsService.instance.trackScreenView('RoundResultScreen');
 
     return roomAsync.when(
       data: (room) {

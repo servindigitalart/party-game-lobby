@@ -538,6 +538,81 @@ Business Decisions
 
 ---
 
+# Implementation
+
+Analytics is a **destination**, not a service the app calls.
+
+```
+Gameplay → GameTelemetryService → AppLogger → AnalyticsDestination
+                                                 → Firebase Analytics
+```
+
+`lib/analytics/analytics_destination.dart` is the only file in the
+application that imports `firebase_analytics`. Gameplay emits one telemetry
+event; analytics receives it automatically. No feature calls analytics.
+
+## Mapping registry
+
+`lib/analytics/analytics_event_mapping.dart` maps telemetry event names to
+analytics event names. It is an **allowlist**: a telemetry event with no
+entry never reaches Firebase.
+
+That filter is the point. Telemetry emits engineering diagnostics
+(`firestore_transaction`, `heartbeat_failed`, `room_listener_attached`) at a
+volume that is useful in Talker and Crashlytics and meaningless as product
+analytics. Those stay out.
+
+A mapping declares:
+
+name — analytics event name on success, defaulting to the telemetry name
+
+failureName — name when the action failed; omitted means failures are dropped
+
+resolveName — for the one event (`phase_changed`) that carries several
+product meanings
+
+parameters — payload keys forwarded; everything else is dropped, so a payload
+can grow for debugging without changing what analytics collects
+
+## Deduplication
+
+The `started` half of every operation is dropped, so an action is counted
+once, when it completes. `succeeded` maps to `name`, `failed` to
+`failureName`, and retries/cancellations are never forwarded.
+
+## Parameter policy
+
+Every event carries a fixed, short set of Session Context parameters:
+`player_count`, `round`, `platform`, plus `room_code_hash`.
+
+Omitted deliberately: values Firebase already collects (locale, OS version,
+session), `player_id` (sent once via `setUserId`, from Session Context), and
+`player_name` / `host_id`, which identify people.
+
+Room codes are hashed. A room code is a shared secret — anyone holding one
+can join a private game — and Firebase is an external service.
+
+Booleans are converted to 1/0 and strings truncated at 100 characters, both
+of which Firebase requires.
+
+## Screen views
+
+`screen_changed` telemetry becomes `logScreenView`, not a custom event, so it
+lands in Firebase's built-in screen reports.
+
+## AnalyticsService
+
+`AnalyticsService` no longer touches Firebase. It remains for two reasons:
+
+1. Progression, seasons, titles, leaderboards, ads and purchases are not
+   instrumented with telemetry yet. Their events are emitted under the
+   `analytics` log category, which the destination forwards verbatim. Each
+   moves into the registry as its feature is instrumented.
+2. Retention metrics (days since install, session counts, return windows) are
+   stateful bookkeeping over SharedPreferences that telemetry cannot derive.
+
+---
+
 # Golden Rule
 
 Never collect data because it "might be useful".

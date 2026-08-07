@@ -13,7 +13,6 @@ import '../core/theme/app_shapes.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/app_typography.dart';
-import '../analytics/analytics_service.dart';
 import '../core/logging/log_category.dart';
 import '../core/telemetry/game_telemetry_service.dart';
 import '../core/logging/log_level.dart';
@@ -31,7 +30,6 @@ class LobbyScreen extends ConsumerStatefulWidget {
 }
 
 class _LobbyScreenState extends ConsumerState<LobbyScreen> {
-  final _analytics = AnalyticsService.instance;
   final _telemetry = GameTelemetryService.instance;
   Timer? _cleanupTimer;
 
@@ -40,7 +38,6 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     super.initState();
 
     // Track screen view
-    _analytics.trackScreenView('LobbyScreen');
     _telemetry.transition('lobby');
 
     // Start periodic cleanup check every 30 seconds
@@ -146,13 +143,6 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       // `match_started` is emitted by RoomRepository.startFirstRound, which
       // owns the transition, and Session Context is refreshed from the room
       // snapshot — neither belongs in the UI layer.
-
-      // Track game started
-      await _analytics.logGameStarted(
-        roomCode: roomCode,
-        playerCount: room.players.length,
-        totalRounds: room.totalRounds,
-      );
 
       if (context.mounted) {
         Navigator.of(context).pushReplacement(

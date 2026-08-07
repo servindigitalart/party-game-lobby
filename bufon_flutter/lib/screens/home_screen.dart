@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_providers.dart';
 import '../core/telemetry/game_telemetry_service.dart';
-import '../analytics/analytics_service.dart';
 import '../core/exceptions.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
@@ -25,14 +24,12 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _nameController = TextEditingController();
   final _codeController = TextEditingController();
-  final _analytics = AnalyticsService.instance;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     // Track screen view
-    _analytics.trackScreenView('HomeScreen');
     GameTelemetryService.instance.transition('home');
   }
 
