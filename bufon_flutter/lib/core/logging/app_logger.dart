@@ -8,6 +8,13 @@ import 'log_category.dart';
 import 'log_level.dart';
 import 'talker_log_destination.dart';
 
+/// Supplies a slice of context to be merged into every log entry.
+///
+/// Each contributor (GameTelemetryService's Session Context, a future
+/// Authentication, DeviceInfo or Performance provider) owns one of these and
+/// knows nothing about the others.
+typedef AppLogContextProvider = Map<String, dynamic> Function();
+
 /// Structured logging facade for Bufón.
 ///
 /// [AppLogger] is the only part of the application allowed to know how logs
@@ -31,15 +38,18 @@ class AppLogger {
   static final AppLogger instance = AppLogger._internal();
 
   final List<AppLogDestination> _destinations = [];
-  bool _isInitialized = false;
 
-  /// Supplies context (e.g. session id, room code, player id) that should be
+  /// Callbacks supplying context (e.g. session id, room code, player id)
   /// automatically attached to every subsequent log entry.
   ///
-  /// This is the extension point GameTelemetryService will use later to
-  /// inject Session Context (docs/engineering/LOGGING.md) without AppLogger
-  /// needing to know anything about sessions, rooms or players.
-  Map<String, dynamic> Function()? _contextProvider;
+  /// This is the extension point services use to contribute context without
+  /// AppLogger knowing anything about sessions, rooms, players or devices:
+  /// GameTelemetryService owns Session Context, and a future
+  /// Authentication / DeviceInfo / Performance provider contributes its own
+  /// slice alongside it.
+  final List<AppLogContextProvider> _contextProviders = [];
+
+  bool _isInitialized = false;
 
   /// Initializes the logging system. Must be called once during app
   /// startup, before other services that may want to log.
@@ -69,15 +79,27 @@ class AppLogger {
   /// Registers a callback invoked on every log call to obtain context that
   /// should be merged into that entry (e.g. current session/room/player).
   ///
-  /// Explicit `context` passed to a log call takes precedence over keys
-  /// provided here.
-  void attachContextProvider(Map<String, dynamic> Function() provider) {
-    _contextProvider = provider;
+  /// Any number of providers may be attached; each contributes an
+  /// independent slice of context and none needs to know the others exist.
+  /// They are merged in registration order, so a later provider overrides
+  /// an earlier one on a shared key, and explicit `context` passed to a log
+  /// call overrides all of them.
+  ///
+  /// A provider that throws is skipped for that entry — logging must never
+  /// fail because a contributor is unavailable
+  /// (docs/telemetry/TELEMETRY_SPEC.md: "Telemetry is passive").
+  void attachContextProvider(AppLogContextProvider provider) {
+    _contextProviders.add(provider);
   }
 
-  /// Removes a previously attached context provider, if any.
-  void detachContextProvider() {
-    _contextProvider = null;
+  /// Removes [provider] if it was attached; removes every provider when
+  /// called without an argument.
+  void detachContextProvider([AppLogContextProvider? provider]) {
+    if (provider == null) {
+      _contextProviders.clear();
+    } else {
+      _contextProviders.remove(provider);
+    }
   }
 
   /// Very detailed information. Development only; dropped in release
@@ -199,7 +221,7 @@ class AppLogger {
     }
 
     final mergedContext = <String, dynamic>{
-      ...?_contextProvider?.call(),
+      ..._collectContext(),
       ...?context,
     };
 
@@ -221,5 +243,23 @@ class AppLogger {
         // (docs/telemetry/TELEMETRY_SPEC.md: "Telemetry is passive").
       }
     }
+  }
+
+  /// Merges every attached provider's context in registration order.
+  ///
+  /// A provider that throws contributes nothing rather than failing the log
+  /// call, so one broken contributor cannot blind the others.
+  Map<String, dynamic> _collectContext() {
+    if (_contextProviders.isEmpty) return const {};
+
+    final merged = <String, dynamic>{};
+    for (final provider in _contextProviders) {
+      try {
+        merged.addAll(provider());
+      } catch (_) {
+        // Intentionally skipped; see doc comment above.
+      }
+    }
+    return merged;
   }
 }

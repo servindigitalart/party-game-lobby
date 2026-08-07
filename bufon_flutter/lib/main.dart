@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'analytics/analytics_service.dart';
 import 'core/logging/app_logger.dart';
+import 'core/logging/log_category.dart';
+import 'core/telemetry/game_telemetry_service.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'screens/home_screen.dart';
@@ -15,6 +17,13 @@ void main() async {
   // Structured logging must be ready before any other service starts,
   // so every subsequent init step can be logged.
   AppLogger.instance.init();
+
+  // Telemetry owns Session Context, so it must be wired into AppLogger
+  // before anything else produces an event or a log line.
+  final telemetry = GameTelemetryService.instance;
+  telemetry.init();
+  telemetry.startSession();
+  telemetry.track(AppLogCategory.app, 'app_started');
 
   // Set system UI overlay style for dark theme
   SystemChrome.setSystemUIOverlayStyle(

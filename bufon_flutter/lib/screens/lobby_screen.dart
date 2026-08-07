@@ -16,6 +16,8 @@ import '../core/theme/app_typography.dart';
 import '../analytics/analytics_service.dart';
 import '../core/logging/app_logger.dart';
 import '../core/logging/log_category.dart';
+import '../core/telemetry/game_telemetry_service.dart';
+import '../core/telemetry/telemetry_context.dart';
 import '../presentation/screens/paywall_screen.dart';
 import '../presentation/widgets/animated_primary_button.dart';
 import 'game_screen.dart';
@@ -30,6 +32,7 @@ class LobbyScreen extends ConsumerStatefulWidget {
 
 class _LobbyScreenState extends ConsumerState<LobbyScreen> {
   final _analytics = AnalyticsService.instance;
+  final _telemetry = GameTelemetryService.instance;
   Timer? _cleanupTimer;
 
   @override
@@ -38,6 +41,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
 
     // Track screen view
     _analytics.trackScreenView('LobbyScreen');
+    _telemetry.transition('lobby');
 
     // Start periodic cleanup check every 30 seconds
     _cleanupTimer = Timer.periodic(
@@ -133,6 +137,20 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         roomCode: room.code,
         questionId: question.id,
         questionText: question.text,
+      );
+
+      _telemetry.updateContext({
+        TelemetryKeys.playerCount: room.players.length,
+        TelemetryKeys.round: 1,
+        TelemetryKeys.gameState: 'playing',
+      });
+
+      // Room code / player count already travel in Session Context, so the
+      // payload only carries what is specific to this match.
+      _telemetry.track(
+        AppLogCategory.gameplay,
+        'match_started',
+        payload: {'total_rounds': room.totalRounds},
       );
 
       // Track game started

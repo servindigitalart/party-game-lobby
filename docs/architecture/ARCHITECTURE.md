@@ -358,6 +358,26 @@ Never send personal information.
 
 ---
 
+# Telemetry
+
+`GameTelemetryService` (`lib/core/telemetry/`) is the single source of truth
+for gameplay telemetry.
+
+Meaningful gameplay actions emit one `TelemetryEvent` through it. The event is
+handed to `AppLogger`, which fans it out to every registered
+`AppLogDestination`. Telemetry does not own a separate dispatcher.
+
+Controllers, repositories and services call GameTelemetryService.
+
+They never call Talker, Firebase Analytics or Crashlytics directly.
+
+GameTelemetryService owns Session Context and registers it with AppLogger, so
+every log entry inherits session, room and device information automatically.
+
+See docs/telemetry/TELEMETRY_SPEC.md.
+
+---
+
 # Logging
 
 Logging should exist at every architectural layer.

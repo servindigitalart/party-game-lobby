@@ -4,6 +4,9 @@ import '../../../models/player.dart';
 import '../../services/firebase_service.dart';
 import '../../data/repositories/room_repository.dart';
 import '../../core/exceptions.dart';
+import '../../core/logging/log_category.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
+import '../../core/telemetry/telemetry_context.dart';
 import '../../analytics/analytics_service.dart';
 
 /// High-level controller for game operations
@@ -16,6 +19,7 @@ class GameController {
   final FirebaseService _firebaseService;
   final RoomRepository _roomRepository;
   final AnalyticsService _analytics = AnalyticsService.instance;
+  final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
   GameController(this._firebaseService, this._roomRepository);
 
@@ -25,25 +29,45 @@ class GameController {
   /// (3 free games/day, ad unlocks, Night Pass) applies per-room and is
   /// enforced when a game actually starts, see [startGame].
   Future<Room> createRoom(String hostId, String hostName) async {
+    final operation = _telemetry.start(AppLogCategory.room, 'room_created');
+
     Room? room;
-    for (var attempt = 0; attempt < 5; attempt++) {
-      final roomCode = _firebaseService.generateRoomCode();
-      try {
-        room = await _roomRepository.createRoom(roomCode, hostId, hostName);
-        break;
-      } on RoomException catch (e) {
-        if (e.code != 'ROOM_EXISTS' || attempt == 4) {
-          rethrow;
+    var attempts = 0;
+    try {
+      for (var attempt = 0; attempt < 5; attempt++) {
+        attempts = attempt + 1;
+        final roomCode = _firebaseService.generateRoomCode();
+        try {
+          room = await _roomRepository.createRoom(roomCode, hostId, hostName);
+          break;
+        } on RoomException catch (e) {
+          if (e.code != 'ROOM_EXISTS' || attempt == 4) {
+            rethrow;
+          }
         }
       }
+
+      if (room == null) {
+        throw RoomException(
+          'Could not create a unique room',
+          code: 'ROOM_EXISTS',
+        );
+      }
+    } catch (e, stackTrace) {
+      operation.fail(e, stackTrace: stackTrace, payload: {'attempts': attempts});
+      rethrow;
     }
 
-    if (room == null) {
-      throw RoomException(
-        'Could not create a unique room',
-        code: 'ROOM_EXISTS',
-      );
-    }
+    // Session Context first: every later event inherits the room the host
+    // is now in without repeating it in a payload.
+    _telemetry.updateContext({
+      TelemetryKeys.roomCode: room.code,
+      TelemetryKeys.hostId: hostId,
+      TelemetryKeys.playerId: hostId,
+      TelemetryKeys.playerName: hostName,
+      TelemetryKeys.playerCount: room.players.length,
+    });
+    operation.finish(payload: {'attempts': attempts});
 
     // Analytics: Track game creation
     await _analytics.logGameCreated(roomCode: room.code);
@@ -53,8 +77,25 @@ class GameController {
 
   /// Join an existing room
   Future<Room> joinRoom(String code, String playerId, String playerName) async {
-    final player = Player(id: playerId, name: playerName);
-    final room = await _roomRepository.joinRoom(code.toUpperCase(), player);
+    final operation = _telemetry.start(AppLogCategory.room, 'room_joined');
+
+    final Room room;
+    try {
+      final player = Player(id: playerId, name: playerName);
+      room = await _roomRepository.joinRoom(code.toUpperCase(), player);
+    } catch (e, stackTrace) {
+      operation.fail(e, stackTrace: stackTrace);
+      rethrow;
+    }
+
+    _telemetry.updateContext({
+      TelemetryKeys.roomCode: room.code,
+      TelemetryKeys.hostId: room.hostId,
+      TelemetryKeys.playerId: playerId,
+      TelemetryKeys.playerName: playerName,
+      TelemetryKeys.playerCount: room.players.length,
+    });
+    operation.finish();
 
     await _analytics.logGameJoined(
       roomCode: room.code,

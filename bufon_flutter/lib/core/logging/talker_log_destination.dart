@@ -64,8 +64,13 @@ class TalkerLogDestination implements AppLogDestination {
 
   String _format(AppLogEntry entry) {
     final label = entry.category.label;
-    if (entry.context.isEmpty) return '[$label] ${entry.message}';
-    final contextString = entry.context.entries
+    // Keys starting with '_' carry structured objects meant for other
+    // destinations (e.g. the typed TelemetryEvent), not for the console.
+    final printable = entry.context.entries.where(
+      (e) => !e.key.startsWith('_'),
+    );
+    if (printable.isEmpty) return '[$label] ${entry.message}';
+    final contextString = printable
         .map((e) => '${e.key}=${e.value}')
         .join(' ');
     return '[$label] ${entry.message} | $contextString';

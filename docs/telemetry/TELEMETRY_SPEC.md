@@ -127,11 +127,10 @@ TelemetryEvent
 
 TelemetryContext
 
-TelemetryDispatcher
+TelemetryOperation
 
-TelemetryDestination
-
-EventFactory
+Dispatch and destinations are provided by AppLogger, not by a telemetry-owned
+dispatcher — see "Implementation" below.
 
 ---
 
@@ -674,6 +673,102 @@ Automatic anomaly detection
 AI-assisted bug clustering
 
 Predictive crash detection
+
+---
+
+# Implementation
+
+`lib/core/telemetry/` is the concrete implementation of this specification.
+
+Files
+
+game_telemetry_service.dart
+
+telemetry_event.dart
+
+telemetry_context.dart
+
+telemetry_operation.dart
+
+## Dispatch
+
+This specification originally described a TelemetryDispatcher and a
+TelemetryDestination owned by the telemetry layer. The implementation does not
+build them, because AppLogger already owns exactly that mechanism
+(`AppLogDestination` + `registerDestination`). A second fan-out would duplicate
+a responsibility and force every future consumer to subscribe twice.
+
+Actual flow:
+
+Gameplay
+
+↓
+
+GameTelemetryService
+
+↓
+
+TelemetryEvent
+
+↓
+
+AppLogger
+
+↓
+
+AppLogDestination
+
+↓
+
+Talker (today) — CrashReporter, Firebase Analytics, Debug Overlay, BigQuery
+(future)
+
+A new destination implements `AppLogDestination` and reads
+`entry.telemetryEvent`. Non-null means the entry is a telemetry event; null
+means it is a plain log line. No change to GameTelemetryService's public API is
+required to add one.
+
+## Category and Severity
+
+Telemetry reuses `AppLogCategory` and `AppLogLevel` rather than declaring
+parallel `TelemetryCategory` / `TelemetrySeverity` enums. The severity list in
+this document matches `AppLogLevel` exactly, and maintaining two taxonomies for
+the same concept would violate AGENTS.md ("Never introduce a second
+implementation of an existing feature"). Categories missing from
+`AppLogCategory` are added there as their owning features arrive.
+
+`TelemetryStatus` has no logging equivalent and is defined by the telemetry
+layer.
+
+## Public API
+
+track()
+
+start() → TelemetryOperation.finish() / .fail() / .cancel()
+
+fail()
+
+transition()
+
+startSession() / endSession()
+
+updateContext() / clearContext()
+
+Session Context is a map keyed by `TelemetryKeys` constants. Adding a new
+contextual field is a new constant, never a new method — which is what keeps
+this API stable as the context list above grows.
+
+## Not yet implemented
+
+App Version and Build Number keys exist but are unset (no build-metadata
+dependency in the project yet).
+
+Sampling, offline queueing and retry are not implemented; telemetry is
+synchronous and in-process.
+
+Analytics and Crashlytics still emit their own events through AnalyticsService.
+Migrating them behind telemetry destinations is a later phase; until then, the
+old and new pipelines coexist for the instrumented events.
 
 ---
 
