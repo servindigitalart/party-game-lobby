@@ -1,9 +1,8 @@
 // services/ad_service.dart
-import 'dart:io';
 import '../core/telemetry/telemetry_event.dart';
+import '../core/config/admob_config.dart';
 import '../core/logging/log_level.dart';
 import '../core/telemetry/game_telemetry_service.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../core/logging/app_logger.dart';
 import '../core/logging/log_category.dart';
@@ -27,29 +26,42 @@ class AdService {
   final GameTelemetryService _telemetry = GameTelemetryService.instance;
   DateTime? _adStartTime;
 
-  // Test ad unit IDs (safe for development)
-  static const String _testAdUnitIdAndroid =
-      'ca-app-pub-3940256099942544/5224354917';
-  static const String _testAdUnitIdIOS =
-      'ca-app-pub-3940256099942544/1712485313';
-
-  // Production ad unit IDs (replace with your actual IDs)
-  static const String _prodAdUnitIdAndroid = 'ca-app-pub-XXXX/YYYY';
-  static const String _prodAdUnitIdIOS = 'ca-app-pub-XXXX/YYYY';
-
-  /// Get the appropriate ad unit ID based on platform and build mode
-  String get _adUnitId {
-    if (kReleaseMode) {
-      // Production
-      return Platform.isAndroid ? _prodAdUnitIdAndroid : _prodAdUnitIdIOS;
-    } else {
-      // Debug/Test
-      return Platform.isAndroid ? _testAdUnitIdAndroid : _testAdUnitIdIOS;
-    }
-  }
+  /// Rewarded unit for this platform and build mode.
+  ///
+  /// Every AdMob identifier lives in [AdMobConfig]; none are declared here.
+  /// This used to hold four constants of its own, two of which were
+  /// unfilled placeholders that release builds actually
+  /// requested.
+  String get _adUnitId => AdMobConfig.instance.rewardedId;
 
   /// Check if ad is ready to show
   bool get isAdReady => _isAdReady && !_isShowing;
+
+  /// Whether the resolved ad units are safe to serve in this build.
+  ///
+  /// False only when a non-debug build resolved to a Google test unit.
+  /// Checked before every load so a bad Remote Config override cannot start
+  /// serving sample ads mid-session.
+  bool get _idsAreSafe => AdMobConfig.instance.isSafeFor();
+
+  void _reportUnsafeIds(String stage) {
+    final offenders = AdMobConfig.instance.unsafeIds();
+    // Fails the build in debug and profile; in release the load is refused
+    // instead, because crashing a player's session over an ad is worse than
+    // showing no ad.
+    assert(
+      offenders.isEmpty,
+      'Release build resolved Google test ad ids: ${offenders.join(', ')}',
+    );
+    _telemetry.fail(
+      AppLogCategory.ads,
+      'ad_config_invalid',
+      error: StateError(
+        'Non-debug build resolved Google test ad ids: ${offenders.join(', ')}',
+      ),
+      payload: {'stage': stage},
+    );
+  }
 
   /// Initialize the Mobile Ads SDK
   Future<void> initialize() async {
@@ -70,10 +82,22 @@ class AdService {
         stackTrace: stackTrace,
       );
     }
+
+    if (!_idsAreSafe) _reportUnsafeIds('initialize');
   }
 
   /// Load a rewarded ad with exponential backoff retry
   Future<void> loadRewardedAd() async {
+    // Refuse rather than serve Google's sample inventory against a real
+    // account. isAdReady stays false, so the paywall shows its "no ad
+    // available" path instead of a broken one.
+    if (!_idsAreSafe) {
+      _reportUnsafeIds('load');
+      _isLoading = false;
+      _isAdReady = false;
+      return;
+    }
+
     if (_isLoading || _isAdReady) {
       AppLogger.instance.debug(
         AppLogCategory.ads,

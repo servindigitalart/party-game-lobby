@@ -3,8 +3,24 @@
 // in this file is written against v1, so it is imported explicitly. Without
 // this the whole functions project fails to compile and nothing deploys.
 import * as functions from 'firebase-functions/v1';
+import { defineSecret } from 'firebase-functions/params';
 import * as admin from 'firebase-admin';
 import { google } from 'googleapis';
+import { verifyAppleReceipt } from './purchases/appleReceipt';
+import {
+  ANDROID_PACKAGE_NAME,
+  MissingSecretError,
+  NIGHT_PASS_PRODUCT_ID,
+} from './purchases/config';
+
+/**
+ * App Store shared secret, read only from Firebase Functions Secrets.
+ *
+ * Declaring it this way is what binds it to the function at deploy time and
+ * keeps it out of source, out of `.env` and out of any log line. Set it
+ * with: firebase functions:secrets:set APPLE_SHARED_SECRET
+ */
+const appleSharedSecret = defineSecret('APPLE_SHARED_SECRET');
 
 admin.initializeApp();
 
@@ -27,7 +43,9 @@ const db = admin.firestore();
  * - expiresAt?: Timestamp
  * - error?: string
  */
-export const verifyNightPass = functions.https.onCall(async (data, context) => {
+export const verifyNightPass = functions
+  .runWith({ secrets: [appleSharedSecret] })
+  .https.onCall(async (data, context) => {
   // Ensure user is authenticated
   if (!context.auth) {
     throw new functions.https.HttpsError(
@@ -46,7 +64,7 @@ export const verifyNightPass = functions.https.onCall(async (data, context) => {
     );
   }
 
-  if (productId !== 'night_pass_12h') {
+  if (productId !== NIGHT_PASS_PRODUCT_ID) {
     throw new functions.https.HttpsError(
       'invalid-argument',
       'ID de producto inválido'
@@ -176,8 +194,11 @@ async function verifyAndroidPurchase(
     
     const androidPublisher = google.androidpublisher('v3');
     
-    // Replace with your actual package name
-    const packageName = 'com.bufon.flutter';
+    // Declared once in purchases/config.ts. This previously held a
+    // hand-typed package that matched neither the Android applicationId nor
+    // anything else in the project, so Google Play rejected every
+    // verification and no Android purchase could ever be granted.
+    const packageName = ANDROID_PACKAGE_NAME;
 
     // Authenticate (uses GOOGLE_APPLICATION_CREDENTIALS env var)
     const auth = new google.auth.GoogleAuth({
@@ -229,81 +250,55 @@ async function verifyAndroidPurchase(
 }
 
 /**
- * Verify iOS purchase with App Store Server API
+ * Verify iOS purchase with the App Store.
+ *
+ * Thin wrapper over `verifyAppleReceipt`, which owns the production →
+ * sandbox flow, the bundle id check and the secret handling. See
+ * purchases/appleReceipt.ts for why the previous implementation could
+ * recurse without bound on TestFlight receipts.
  */
 async function verifyIOSPurchase(
   receiptData: string,
   productId: string
 ): Promise<boolean> {
   try {
-    // Apple receipt validation endpoint
-    // Use sandbox URL for testing, production URL for live
-    const isSandbox = process.env.FUNCTIONS_EMULATOR === 'true';
-    const verifyUrl = isSandbox
-      ? 'https://sandbox.itunes.apple.com/verifyReceipt'
-      : 'https://buy.itunes.apple.com/verifyReceipt';
-
-    // Replace with your actual shared secret from App Store Connect
-    const sharedSecret = process.env.APPLE_SHARED_SECRET || '';
-
-    const response = await fetch(verifyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        'receipt-data': receiptData,
-        'password': sharedSecret,
-        'exclude-old-transactions': true,
-      }),
+    const result = await verifyAppleReceipt({
+      receiptData,
+      productId,
+      sharedSecret: appleSharedSecret.value(),
     });
 
-    const result = await response.json();
-
-    // Check status code
-    // 0 = valid, 21007 = sandbox receipt sent to production (retry with sandbox)
-    if (result.status === 21007) {
-      // Retry with sandbox
-      return verifyIOSPurchase(receiptData, productId);
+    if (result.valid) {
+      functions.logger.info('iOS receipt verified', {
+        environment: result.environment,
+        productId,
+      });
+      return true;
     }
 
-    if (result.status !== 0) {
-      functions.logger.error('iOS receipt validation failed', {
-        status: result.status,
+    // Reason and status only. The receipt and the secret never appear.
+    functions.logger.warn('iOS receipt rejected', {
+      reason: result.reason,
+      status: result.status,
+    });
+    return false;
+  } catch (error: any) {
+    if (error instanceof MissingSecretError) {
+      // Configuration fault, not a bad purchase. Logged as an error so it
+      // is impossible to miss; the secret's value is never included.
+      functions.logger.error('App Store verification is not configured', {
+        secret: error.secretName,
       });
       return false;
     }
 
-    // Verify product ID matches
-    const latestReceipt = result.latest_receipt_info?.[0];
-    if (!latestReceipt || latestReceipt.product_id !== productId) {
-      functions.logger.warn('iOS product ID mismatch');
-      return false;
-    }
-
-    return true;
-  } catch (error: any) {
-    // In development, allow sandbox purchases
-    const isDevelopment = process.env.FUNCTIONS_EMULATOR === 'true';
-    
-    if (isDevelopment) {
-      functions.logger.info('Development mode: allowing iOS sandbox purchase');
-      return true;
-    }
-
     functions.logger.error('iOS verification error', {
-      error: error.message,
+      message: error?.message,
     });
     return false;
   }
 }
 
-/**
- * Scheduled function to check for ended seasons and finalize them
- * 
- * Runs daily at 00:00 UTC
- * Checks all active seasons and finalizes any that have ended
- */
 export const finalizeEndedSeasons = functions.pubsub
   .schedule('0 0 * * *') // Run at midnight UTC every day
   .timeZone('UTC')

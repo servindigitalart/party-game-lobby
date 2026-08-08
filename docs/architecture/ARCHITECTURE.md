@@ -355,6 +355,20 @@ See docs/engineering/ANALYTICS.md.
 
 ---
 
+# App Check
+
+`AppCheckService` (`lib/core/security/`) activates Firebase App Check once,
+from `main.dart`, before any Firebase service is used.
+
+Rules decide what an authenticated user may do. App Check decides whether
+the caller is the app at all — the API key ships inside the binary, so
+without it a script can talk to Firestore directly.
+
+Enforcement is a console setting, not a code one. See
+docs/engineering/APP_CHECK.md.
+
+---
+
 # Crashlytics
 
 `CrashReporter` (`lib/core/crash/`) is the single entry point for every error.

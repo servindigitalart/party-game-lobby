@@ -9,6 +9,7 @@ import 'core/crash/crash_reporter.dart';
 import 'core/crash/firebase_crashlytics_backend.dart';
 import 'core/logging/app_logger.dart';
 import 'core/logging/log_category.dart';
+import 'core/security/app_check_service.dart';
 import 'core/telemetry/app_session_observer.dart';
 import 'core/telemetry/game_telemetry_service.dart';
 import 'core/theme/app_theme.dart';
@@ -59,6 +60,12 @@ void main() {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // App Check before any Firebase service is touched, so the very first
+    // Firestore, Functions or Storage request already carries an attestation
+    // token. Activating later would leave a window of unattested traffic
+    // that enforcement would reject.
+    await AppCheckService.instance.activate();
 
     // Crashlytics is usable now; this flushes anything buffered above.
     await CrashReporter.instance.attachBackend(FirebaseCrashlyticsBackend());
