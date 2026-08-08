@@ -1,5 +1,6 @@
 // presentation/screens/profile_public_screen.dart
 import 'package:flutter/material.dart';
+import '../../core/logging/log_level.dart';
 import '../../core/logging/log_category.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -748,7 +749,17 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
       // Clean up
       if (!mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // Sharing goes through the OS share sheet and fails for reasons
+      // outside the app (cancelled, no storage), so it stays a warning.
+      _telemetry.fail(
+        AppLogCategory.ui,
+        'profile_share_failed',
+        error: e,
+        stackTrace: stackTrace,
+        severity: AppLogLevel.warning,
+      );
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

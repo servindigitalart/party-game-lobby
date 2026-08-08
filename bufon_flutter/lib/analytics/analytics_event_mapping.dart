@@ -246,6 +246,8 @@ const List<String> analyticsContextKeys = [
   TelemetryKeys.playerCount,
   TelemetryKeys.round,
   TelemetryKeys.platform,
+  TelemetryKeys.appVersion,
+  TelemetryKeys.buildNumber,
   // Set only for the moment `session_ended` is emitted, so in practice it
   // appears on that event alone.
   TelemetryKeys.sessionDurationSeconds,

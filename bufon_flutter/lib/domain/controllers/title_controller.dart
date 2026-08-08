@@ -1,5 +1,6 @@
 // domain/controllers/title_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/logging/log_level.dart';
 import '../../core/logging/log_category.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import '../../models/title.dart';
@@ -33,7 +34,8 @@ class TitleController {
       return snapshot.docs
           .map((doc) => UnlockedTitle.fromJson(doc.data(), doc.id))
           .toList();
-    } on FirebaseException catch (e) {
+    } on FirebaseException catch (e, stackTrace) {
+      _readFailed('titles_fetch_failed', e, stackTrace);
       throw GameException('Failed to get unlocked titles: ${e.message}');
     }
   }
@@ -50,134 +52,6 @@ class TitleController {
               .map((doc) => UnlockedTitle.fromJson(doc.data(), doc.id))
               .toList(),
         );
-  }
-
-  /// Evaluate and unlock new titles based on user profile
-  ///
-  /// Returns list of newly unlocked title IDs
-  Future<List<String>> evaluateUnlockedTitles({
-    required String uid,
-    required UserProfile profile,
-    int? globalRank,
-    int? weeklyRank,
-  }) async {
-    try {
-      final currentlyUnlocked = await getUnlockedTitles(uid);
-      final unlockedIds = currentlyUnlocked.map((t) => t.titleId).toSet();
-      final newlyUnlocked = <String>[];
-
-      for (final title in Titles.all) {
-        // Skip if already unlocked
-        if (unlockedIds.contains(title.id)) continue;
-
-        bool shouldUnlock = false;
-        String source = 'milestone';
-
-        // Check unlock conditions
-        switch (title.unlockConditionType) {
-          case UnlockConditionType.xp:
-            shouldUnlock = profile.xp >= title.unlockValue;
-            break;
-
-          case UnlockConditionType.wins:
-            shouldUnlock = profile.totalWins >= title.unlockValue;
-            break;
-
-          case UnlockConditionType.votes:
-            shouldUnlock = profile.totalVotesReceived >= title.unlockValue;
-            break;
-
-          case UnlockConditionType.games:
-            shouldUnlock = profile.totalGames >= title.unlockValue;
-            break;
-
-          case UnlockConditionType.leaderboardRank:
-            source = 'leaderboard';
-            if (globalRank != null && globalRank <= title.unlockValue) {
-              shouldUnlock = true;
-            } else if (weeklyRank != null && weeklyRank <= title.unlockValue) {
-              shouldUnlock = true;
-            }
-            break;
-
-          case UnlockConditionType.nightPass:
-            // Check if user has night_pass_purchase achievement
-            shouldUnlock = profile.hasAchievement('night_pass_purchase');
-            source = 'achievement';
-            break;
-
-          case UnlockConditionType.achievement:
-            if (title.achievementId != null) {
-              shouldUnlock = profile.hasAchievement(title.achievementId!);
-              source = 'achievement';
-            }
-            break;
-
-          case UnlockConditionType.secret:
-            // Secret titles have custom unlock logic
-            // For now, skip them
-            continue;
-        }
-
-        if (shouldUnlock) {
-          await unlockTitle(uid: uid, titleId: title.id, source: source);
-          newlyUnlocked.add(title.id);
-        }
-      }
-
-      return newlyUnlocked;
-    } catch (e) {
-      throw GameException('Failed to evaluate titles: $e');
-    }
-  }
-
-  /// Unlock a specific title for a user
-  ///
-  /// Uses transaction to prevent duplicate unlocks
-  Future<void> unlockTitle({
-    required String uid,
-    required String titleId,
-    required String source,
-  }) async {
-    try {
-      final titleRef = _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('titles')
-          .doc(titleId);
-
-      await _firestore.runTransaction((transaction) async {
-        final doc = await transaction.get(titleRef);
-
-        // Prevent duplicate unlock
-        if (doc.exists) {
-          return;
-        }
-
-        final unlockedTitle = UnlockedTitle(
-          titleId: titleId,
-          unlockedAt: DateTime.now(),
-          source: source,
-        );
-
-        transaction.set(titleRef, unlockedTitle.toJson());
-      });
-
-      final title = Titles.getById(titleId);
-      if (title != null) {
-        _telemetry.track(
-          AppLogCategory.progression,
-          'title_unlocked',
-          payload: {
-            'title_id': titleId,
-            'rarity': title.rarity.name,
-            'source': source,
-          },
-        );
-      }
-    } on FirebaseException catch (e) {
-      throw GameException('Failed to unlock title: ${e.message}');
-    }
   }
 
   /// Equip a title for a user
@@ -214,7 +88,16 @@ class TitleController {
           payload: {'title_id': titleId, 'rarity': title.rarity.name},
         );
       }
-    } on FirebaseException catch (e) {
+    } on FirebaseException catch (e, stackTrace) {
+      // The player tapped a title and it did not stick: unexpected, and
+      // worth a crash report.
+      _telemetry.fail(
+        AppLogCategory.progression,
+        'title_equip_failed',
+        error: e,
+        stackTrace: stackTrace,
+        payload: {'title_id': titleId},
+      );
       throw GameException('Failed to equip title: ${e.message}');
     }
   }
@@ -225,7 +108,13 @@ class TitleController {
       await _firestore.collection('users').doc(uid).update({
         'equippedTitleId': FieldValue.delete(),
       });
-    } on FirebaseException catch (e) {
+    } on FirebaseException catch (e, stackTrace) {
+      _telemetry.fail(
+        AppLogCategory.progression,
+        'title_unequip_failed',
+        error: e,
+        stackTrace: stackTrace,
+      );
       throw GameException('Failed to unequip title: ${e.message}');
     }
   }
@@ -244,7 +133,8 @@ class TitleController {
           .get();
 
       return doc.exists;
-    } on FirebaseException catch (e) {
+    } on FirebaseException catch (e, stackTrace) {
+      _readFailed('title_check_failed', e, stackTrace);
       throw GameException('Failed to check title: ${e.message}');
     }
   }
@@ -271,9 +161,31 @@ class TitleController {
       });
 
       return available.take(limit).toList();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      _readFailed('next_titles_fetch_failed', e, stackTrace);
       throw GameException('Failed to get next titles: $e');
     }
+  }
+
+  /// Records a failed read.
+  ///
+  /// Reads run inside providers that rebuild and retry, and the screen
+  /// already shows an error state, so a failure here is recoverable and must
+  /// stay a warning: it becomes a breadcrumb, never a crash report, and a
+  /// player scrolling a list offline cannot flood Crashlytics.
+  ///
+  /// The original stack trace is forwarded explicitly. Wrapping in
+  /// `GameException('...: $e')` stringifies the cause and throws from here,
+  /// so without this the report would point at the wrapper instead of the
+  /// Firestore call that actually failed.
+  void _readFailed(String event, Object error, StackTrace stackTrace) {
+    _telemetry.fail(
+      AppLogCategory.progression,
+      event,
+      error: error,
+      stackTrace: stackTrace,
+      severity: AppLogLevel.warning,
+    );
   }
 
   /// Calculate unlock progress (0.0 to 1.0)

@@ -280,13 +280,17 @@ test('player update: blocked from writing another player\'s answer', async () =>
 
 // --- Player update: votes ---
 
-test('player update: allowed to cast your own vote for someone else', async () => {
+test('player update: casting a vote is server-only (was: allowed)', async () => {
+  // This test used to assert that a client could write its own `votedFor`.
+  // That capability was removed with Security Hotfix B1: `votedFor` and
+  // `score` are written together by the `submitVote` callable, because rules
+  // cannot require two document writes to happen as one.
   await seedRoom('ABC123', baseRoom({ phase: 'voting' }), [
     basePlayer(HOST, { currentAnswer: 'algo' }),
     basePlayer(P2),
   ]);
   const db = testEnv.authenticatedContext(P2).firestore();
-  await assertSucceeds(
+  await assertFails(
     updateDoc(doc(db, 'rooms', 'ABC123', 'players', P2), { votedFor: HOST }),
   );
 });
@@ -312,13 +316,17 @@ test('player update: blocked from voting twice', async () => {
 
 // --- Player update: score ---
 
-test('player update: allowed for the voter to award exactly +100 to the voted-for player', async () => {
+test('player update: awarding points is server-only (was: allowed +100)', async () => {
+  // The +100 award used to be permitted on its own, guarded only by the
+  // caller's own votedFor still being null — which a client that never voted
+  // satisfied forever. That was exploit B1. No client-writable path to
+  // `score` remains.
   await seedRoom('ABC123', baseRoom({ phase: 'voting' }), [
     basePlayer(HOST, { score: 0 }),
     basePlayer(P2),
   ]);
   const db = testEnv.authenticatedContext(P2).firestore();
-  await assertSucceeds(
+  await assertFails(
     updateDoc(doc(db, 'rooms', 'ABC123', 'players', HOST), { score: 100 }),
   );
 });
@@ -434,4 +442,294 @@ test('unauthenticated: cannot read or write rooms', async () => {
   await seedRoom('ABC123', baseRoom(), [basePlayer(HOST)]);
   const db = testEnv.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(db, 'rooms', 'ABC123')));
+});
+
+// ---------------------------------------------------------------------------
+// Progression is server-authoritative (Backend Infrastructure Phase 1).
+//
+// Every one of these is an attempt a modified client could actually make.
+// ---------------------------------------------------------------------------
+
+async function seedProfile(uid, overrides = {}) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users', uid), {
+      uid,
+      xp: 100,
+      level: 2,
+      totalGames: 3,
+      totalWins: 1,
+      totalVotesReceived: 5,
+      unlockedAchievements: ['first_game'],
+      unlockedAvatars: ['default', 'smiley'],
+      selectedAvatar: 'default',
+      ...overrides,
+    });
+  });
+}
+
+test('profile: a player cannot grant itself XP', async () => {
+  await seedProfile(HOST);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(updateDoc(doc(db, 'users', HOST), { xp: 999999 }));
+});
+
+test('profile: a player cannot grant itself wins or games', async () => {
+  await seedProfile(HOST);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(updateDoc(doc(db, 'users', HOST), { totalWins: 100 }));
+  await assertFails(updateDoc(doc(db, 'users', HOST), { totalGames: 100 }));
+  await assertFails(
+    updateDoc(doc(db, 'users', HOST), { totalVotesReceived: 100 })
+  );
+});
+
+test('profile: a player cannot grant itself a level', async () => {
+  await seedProfile(HOST);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(updateDoc(doc(db, 'users', HOST), { level: 99 }));
+});
+
+test('profile: a player cannot grant itself achievements or avatars', async () => {
+  await seedProfile(HOST);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(
+    updateDoc(doc(db, 'users', HOST), {
+      unlockedAchievements: ['first_game', 'twenty_wins'],
+    })
+  );
+  await assertFails(
+    updateDoc(doc(db, 'users', HOST), {
+      unlockedAvatars: ['default', 'smiley', 'diamond'],
+    })
+  );
+});
+
+test('profile: a player cannot create its own profile', async () => {
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(setDoc(doc(db, 'users', HOST), { uid: HOST, xp: 5000 }));
+});
+
+test('profile: selecting an owned avatar is allowed', async () => {
+  await seedProfile(HOST);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertSucceeds(
+    updateDoc(doc(db, 'users', HOST), { selectedAvatar: 'smiley' })
+  );
+});
+
+test('profile: selecting an avatar the server never granted is blocked', async () => {
+  await seedProfile(HOST);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(
+    updateDoc(doc(db, 'users', HOST), { selectedAvatar: 'diamond' })
+  );
+});
+
+test('profile: equipping a title the server never granted is blocked', async () => {
+  await seedProfile(HOST);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(
+    updateDoc(doc(db, 'users', HOST), { equippedTitleId: 'bufon_supremo' })
+  );
+});
+
+test('profile: equipping a granted title is allowed, unequipping always is', async () => {
+  await seedProfile(HOST);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(
+      doc(ctx.firestore(), 'users', HOST, 'unlockedTitles', 'npc_grupo'),
+      { titleId: 'npc_grupo', rarity: 'common', source: 'milestone' }
+    );
+  });
+
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertSucceeds(
+    updateDoc(doc(db, 'users', HOST), { equippedTitleId: 'npc_grupo' })
+  );
+  await assertSucceeds(
+    updateDoc(doc(db, 'users', HOST), { equippedTitleId: null })
+  );
+});
+
+test('profile: a player cannot write another player profile', async () => {
+  await seedProfile(P2);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(
+    updateDoc(doc(db, 'users', P2), { selectedAvatar: 'smiley' })
+  );
+});
+
+test('titles: a player cannot write its own unlockedTitles', async () => {
+  await seedProfile(HOST);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(
+    setDoc(doc(db, 'users', HOST, 'unlockedTitles', 'bufon_supremo'), {
+      titleId: 'bufon_supremo',
+    })
+  );
+});
+
+test('leaderboards: readable but never client-writable', async () => {
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertSucceeds(
+    getDoc(doc(db, 'leaderboards', 'global_xp', 'entries', HOST))
+  );
+  await assertFails(
+    setDoc(doc(db, 'leaderboards', 'global_xp', 'entries', HOST), { xp: 99999 })
+  );
+});
+
+test('leaderboards: weekly boards are readable and never client-writable', async () => {
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertSucceeds(
+    getDoc(doc(db, 'leaderboards', 'weekly_xp', '2026-W01', HOST))
+  );
+  await assertFails(
+    setDoc(doc(db, 'leaderboards', 'weekly_xp', '2026-W01', HOST), { xp: 1 })
+  );
+});
+
+test('matchCompletions: the idempotency ledger is invisible to clients', async () => {
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(getDoc(doc(db, 'matchCompletions', 'ABC123')));
+  await assertFails(
+    setDoc(doc(db, 'matchCompletions', 'ABC123'), { status: 'completed' })
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Voting is server-authoritative (Security Hotfix B1).
+//
+// The exploit: a client that never voted could replay `score + 100` on
+// another player's document forever, because Firestore rules cannot require
+// the paired `votedFor` write to happen with it. onMatchCompleted then
+// derived votes, wins and XP from that forged score.
+// ---------------------------------------------------------------------------
+
+async function seedVotingRoom() {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'rooms', 'VOTE01'), {
+      code: 'VOTE01',
+      hostId: HOST,
+      phase: 'voting',
+      currentRound: 1,
+    });
+    for (const id of [HOST, P2, OUTSIDER]) {
+      await setDoc(doc(db, 'rooms', 'VOTE01', 'players', id), {
+        id,
+        name: id,
+        score: 0,
+        currentAnswer: 'una respuesta',
+        votedFor: null,
+        isOnline: true,
+        isHost: id === HOST,
+      });
+    }
+  });
+}
+
+test('B1 EXPLOIT: pumping another player score is now impossible', async () => {
+  await seedVotingRoom();
+  const db = testEnv.authenticatedContext(HOST).firestore();
+
+  // The exact write that used to succeed ten times in a row.
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'VOTE01', 'players', P2), { score: 100 })
+  );
+});
+
+test('B1: score cannot be written even alongside a legitimate vote', async () => {
+  await seedVotingRoom();
+  const db = testEnv.authenticatedContext(HOST).firestore();
+
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'VOTE01', 'players', P2), {
+      score: 100,
+      votedFor: null,
+    })
+  );
+});
+
+test('B1: a player cannot write score on their own document', async () => {
+  await seedVotingRoom();
+  const db = testEnv.authenticatedContext(HOST).firestore();
+
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'VOTE01', 'players', HOST), { score: 9999 })
+  );
+});
+
+test('B1: a player can no longer write votedFor at all', async () => {
+  await seedVotingRoom();
+  const db = testEnv.authenticatedContext(HOST).firestore();
+
+  // Marking yourself as having voted was the other half of the old flow.
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'VOTE01', 'players', HOST), { votedFor: P2 })
+  );
+});
+
+test('B1: creating a player with a non-zero score is still rejected', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'rooms', 'VOTE02'), {
+      code: 'VOTE02',
+      hostId: HOST,
+      phase: 'lobby',
+      currentRound: 0,
+    });
+  });
+
+  const db = testEnv.authenticatedContext(P2).firestore();
+  await assertFails(
+    setDoc(doc(db, 'rooms', 'VOTE02', 'players', P2), {
+      id: P2,
+      name: 'cheater',
+      score: 5000,
+      currentAnswer: null,
+      votedFor: null,
+    })
+  );
+});
+
+test('B1: the round reset still works and grants no score', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'rooms', 'VOTE03'), {
+      code: 'VOTE03',
+      hostId: HOST,
+      phase: 'roundResult',
+      currentRound: 1,
+    });
+    for (const id of [HOST, P2]) {
+      await setDoc(doc(db, 'rooms', 'VOTE03', 'players', id), {
+        id,
+        name: id,
+        score: 100,
+        currentAnswer: 'x',
+        votedFor: P2,
+        isOnline: true,
+      });
+    }
+  });
+
+  const db = testEnv.authenticatedContext(HOST).firestore();
+
+  // Clearing is allowed...
+  await assertSucceeds(
+    updateDoc(doc(db, 'rooms', 'VOTE03', 'players', HOST), {
+      currentAnswer: null,
+      votedFor: null,
+    })
+  );
+
+  // ...but it cannot smuggle a score change along with it.
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'VOTE03', 'players', P2), {
+      currentAnswer: null,
+      votedFor: null,
+      score: 500,
+    })
+  );
 });

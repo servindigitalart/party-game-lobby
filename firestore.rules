@@ -104,35 +104,28 @@ service cloud.firestore {
           && request.resource.data.currentAnswer is string
           && request.resource.data.currentAnswer.size() > 0;
 
-        // 2) Cast your own vote once per round, never for yourself
-        //    (submitVoteTransaction, voter's own doc).
-        allow update: if isAuthenticated()
-          && request.auth.uid == playerId
-          && fieldsChanged(['votedFor'])
-          && resource.data.votedFor == null
-          && request.resource.data.votedFor is string
-          && request.resource.data.votedFor != playerId;
+        // 2) Voting is server-only.
+        //
+        //    Both `votedFor` and `score` used to be client-writable, because
+        //    the vote was a client-side transaction over two documents.
+        //    Firestore rules cannot require that two document writes happen
+        //    together, so the score write had to stand alone — and a client
+        //    that never voted could replay it forever, forging XP, wins,
+        //    titles and leaderboard rank through onMatchCompleted.
+        //
+        //    Both writes now happen inside the `submitVote` callable using
+        //    the Admin SDK, which bypasses these rules. No client-writable
+        //    path to either field remains.
 
-        // 3) Heartbeat: update your own presence (connection_service.dart).
+        // 4) Heartbeat: update your own presence (connection_service.dart).
         allow update: if isAuthenticated()
           && request.auth.uid == playerId
           && fieldsChanged(['lastSeen', 'isOnline']);
 
-        // 4) Score is only ever awarded by the voter's client onto the
-        //    OTHER player's doc, always exactly +100 per vote
-        //    (submitVoteTransaction). Blocks writing an arbitrary score
-        //    (including on your own doc), and — critically — requires the
-        //    awarding caller's OWN votedFor to still be null, so the same
-        //    voter can't call this a second time for a different target
-        //    after their one legitimate vote already landed.
-        allow update: if isAuthenticated()
-          && request.auth.uid != playerId
-          && fieldsChanged(['score'])
-          && request.resource.data.score == resource.data.score + 100
-          && get(/databases/$(database)/documents/rooms/$(roomCode)/players/$(request.auth.uid)).data.votedFor == null;
-
-        // 5) Round reset (clearRoundData): only during roundResult, only
+        // 3) Round reset (clearRoundData): only during roundResult, only
         //    nulling currentAnswer/votedFor, only by a live room member.
+        //    Clearing a vote grants nothing, and the phase guard means it
+        //    cannot be used to vote twice inside one round.
         //    Narrows the reset window so another player can't null out
         //    your in-progress answer/vote mid-round.
         allow update: if isAuthenticated()
@@ -164,18 +157,42 @@ service cloud.firestore {
     }
 
     // Users collection (for progression, titles, seasons)
+    // A player may only select an avatar they already own, and only equip a
+    // title the server has already written into unlockedTitles.
+    function ownsSelection(userId) {
+      return (!changedKeys().hasAny(['selectedAvatar'])
+              || request.resource.data.selectedAvatar in resource.data.unlockedAvatars)
+        && (!changedKeys().hasAny(['equippedTitleId'])
+              || request.resource.data.equippedTitleId == null
+              || exists(/databases/$(database)/documents/users/$(userId)/unlockedTitles/$(request.resource.data.equippedTitleId)));
+    }
+
     match /users/{userId} {
       // Users can read their own profile
       allow read: if isAuthenticated() && request.auth.uid == userId;
 
-      // Users can update their own profile (except restricted fields)
+      // Cosmetic choices only. Everything progression grants — xp, level,
+      // totalGames, totalWins, totalVotesReceived, unlockedAchievements,
+      // unlockedAvatars — is written by the onMatchCompleted trigger through
+      // the Admin SDK. A client can pick an avatar or a title it already
+      // owns; it cannot award itself the avatar, the title or the XP.
+      //
+      // `hasOnly` is a whitelist rather than a blacklist on purpose: a new
+      // progression field added later is denied by default instead of being
+      // silently writable until someone remembers to blacklist it.
       allow update: if isAuthenticated()
         && request.auth.uid == userId
-        && !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['totalWins', 'totalGames', 'totalVotesReceived']);
+        && fieldsChanged(['selectedAvatar', 'equippedTitleId'])
+        && ownsSelection(userId);
 
       // Only Cloud Functions can create/delete
       allow create, delete: if false;
+
+      // Titles are granted by the server; the client only reads them.
+      match /unlockedTitles/{titleId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow write: if false; // Only Cloud Functions
+      }
 
       // Season rewards subcollection
       match /seasonRewards/{seasonId} {
@@ -214,6 +231,20 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow write: if false; // Only Cloud Functions
       }
+
+      // Weekly boards are stored per week key. They previously had no rule
+      // block, so they were denied by default even for reads — the weekly
+      // leaderboard screen could never have shown anything.
+      match /{weekKey}/{userId} {
+        allow read: if isAuthenticated();
+        allow write: if false; // Only Cloud Functions
+      }
+    }
+
+    // Server-written record of which matches have already been awarded.
+    // Clients must never see or touch it: it is the idempotency ledger.
+    match /matchCompletions/{roomCode} {
+      allow read, write: if false; // Only Cloud Functions
     }
   }
 }

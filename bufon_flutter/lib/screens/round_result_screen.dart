@@ -147,6 +147,13 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
               .where((player) => player.votedFor == winner.id)
               .length;
 
+          // Progression is not triggered from here any more. The
+          // `onMatchCompleted` Cloud Function fires on the same
+          // phase → finalWinner transition and awards XP, achievements,
+          // titles and leaderboard positions with the Admin SDK. A client
+          // cannot be trusted with any of it, and firestore.rules now
+          // forbids those writes outright.
+
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(

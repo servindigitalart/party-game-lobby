@@ -1,7 +1,10 @@
 // core/telemetry/game_telemetry_service.dart
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../logging/app_logger.dart';
 import '../logging/log_category.dart';
@@ -79,6 +82,25 @@ class GameTelemetryService {
 
     _context = _context.merge(_resolveDeviceContext());
     AppLogger.instance.attachContextProvider(() => _context.toMap());
+
+    // Build metadata needs a platform channel, so it cannot be resolved
+    // synchronously here. It lands in Session Context as soon as it
+    // arrives, which means every log line, crash report and analytics event
+    // from that moment on carries it — with no call site passing it.
+    unawaited(_resolveBuildContext());
+  }
+
+  Future<void> _resolveBuildContext() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      updateContext({
+        TelemetryKeys.appVersion: info.version,
+        TelemetryKeys.buildNumber: info.buildNumber,
+      });
+    } catch (_) {
+      // Telemetry is passive: an app that cannot read its own build number
+      // still has to start.
+    }
   }
 
   // ---------------------------------------------------------------------

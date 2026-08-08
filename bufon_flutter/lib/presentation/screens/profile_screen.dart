@@ -1,5 +1,6 @@
 // presentation/screens/profile_screen.dart
 import 'package:flutter/material.dart';
+import '../../core/logging/log_category.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
@@ -477,7 +478,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // A deliberate player action that failed: reported, not just shown.
+      GameTelemetryService.instance.fail(
+        AppLogCategory.progression,
+        'avatar_select_failed',
+        error: e,
+        stackTrace: stackTrace,
+        payload: {'avatar_id': avatarId},
+      );
+
       HapticService.error();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -332,37 +332,10 @@ void main() {
       expect(event.payload.containsKey(TelemetryKeys.roomCode), isFalse);
     });
 
-    test('vote_submitted is emitted after a successful vote', () async {
-      await startAnswering();
-      await repository.submitAnswerTransaction('ABCD12', 'host', 'a');
-      await repository.submitAnswerTransaction('ABCD12', 'player1', 'b');
-      await firestore.collection('rooms').doc('ABCD12').update({
-        'phase': GamePhase.voting.name,
-      });
-      recorder.clear();
-
-      await repository.submitVoteTransaction('ABCD12', 'host', 'player1');
-
-      expect(recorder.countOf('vote_submitted'), 1);
-    });
-
-    test('voting twice is a warning, not a crash report', () async {
-      await startAnswering();
-      await repository.submitAnswerTransaction('ABCD12', 'host', 'a');
-      await repository.submitAnswerTransaction('ABCD12', 'player1', 'b');
-      await firestore.collection('rooms').doc('ABCD12').update({
-        'phase': GamePhase.voting.name,
-      });
-      await repository.submitVoteTransaction('ABCD12', 'host', 'player1');
-      recorder.clear();
-
-      await expectLater(
-        repository.submitVoteTransaction('ABCD12', 'host', 'player1'),
-        throwsA(isA<Exception>()),
-      );
-
-      expect(crashBackend.reports, isEmpty);
-    });
+    // The vote path moved into the `submitVote` Cloud Function, so its
+    // behaviour is covered end to end in functions/integration.test.mjs
+    // instead. Keeping a client-side test here would only assert against a
+    // transaction the app no longer performs.
   });
 
   group('network instrumentation', () {

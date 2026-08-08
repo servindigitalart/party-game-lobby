@@ -1,5 +1,8 @@
 // functions/src/index.ts
-import * as functions from 'firebase-functions';
+// firebase-functions v7 exposes the v2 API at the package root; everything
+// in this file is written against v1, so it is imported explicitly. Without
+// this the whole functions project fails to compile and nothing deploys.
+import * as functions from 'firebase-functions/v1';
 import * as admin from 'firebase-admin';
 import { google } from 'googleapis';
 
@@ -610,3 +613,9 @@ export const manualFinalizeSeason = functions.https.onCall(async (data, context)
     );
   }
 });
+
+// Progression is server-authoritative: see progression/onMatchCompleted.ts.
+export { onMatchCompleted } from './progression/onMatchCompleted';
+
+// Voting is server-authoritative: see voting/submitVote.ts.
+export { submitVote } from './voting/submitVote';

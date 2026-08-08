@@ -43,6 +43,7 @@ dependencies:
   share_plus: ^10.1.2
   path_provider: ^2.1.5
   talker: ^5.1.20
+  package_info_plus: ^9.0.1
 
 dev_dependencies:
   flutter_test:

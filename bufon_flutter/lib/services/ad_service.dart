@@ -62,11 +62,12 @@ class AdService {
 
       // Preload first ad
       await loadRewardedAd();
-    } catch (e) {
-      AppLogger.instance.error(
+    } catch (e, stackTrace) {
+      _telemetry.fail(
         AppLogCategory.ads,
-        '[AdService] Failed to initialize',
+        'ad_service_init_failed',
         error: e,
+        stackTrace: stackTrace,
       );
     }
   }
@@ -101,36 +102,59 @@ class AdService {
             _setupAdCallbacks();
           },
           onAdFailedToLoad: (error) {
-            AppLogger.instance.warning(
-              AppLogCategory.ads,
-              '[AdService] Failed to load ad: ${error.message}',
-            );
             _isLoading = false;
             _isAdReady = false;
 
-            // Retry with exponential backoff
-            if (_loadAttempts < _maxLoadAttempts) {
-              final delay = Duration(seconds: _loadAttempts * 2);
-              AppLogger.instance.info(
-                AppLogCategory.ads,
-                '[AdService] Retrying in ${delay.inSeconds}s (attempt $_loadAttempts/$_maxLoadAttempts)',
+            final willRetry = _loadAttempts < _maxLoadAttempts;
+
+            // No fill is the normal state of an ad network, and this path
+            // retries on a backoff, so each attempt is a warning breadcrumb
+            // rather than a crash report.
+            _telemetry.fail(
+              AppLogCategory.ads,
+              'ad_load_failed',
+              error: error,
+              severity: AppLogLevel.warning,
+              status: willRetry
+                  ? TelemetryStatus.retried
+                  : TelemetryStatus.failed,
+              payload: {
+                'ad_error_code': error.code,
+                'attempt': _loadAttempts,
+                'max_attempts': _maxLoadAttempts,
+                'will_retry': willRetry,
+              },
+            );
+
+            if (willRetry) {
+              Future.delayed(
+                Duration(seconds: _loadAttempts * 2),
+                loadRewardedAd,
               );
-              Future.delayed(delay, loadRewardedAd);
-            } else {
-              AppLogger.instance.error(
-                AppLogCategory.ads,
-                '[AdService] Max retry attempts reached',
-              );
-              _loadAttempts = 0;
+              return;
             }
+
+            // Only the exhausted case is escalated: it means the player
+            // cannot unlock a game no matter how long they wait, which is
+            // the failure that actually costs a session.
+            _telemetry.fail(
+              AppLogCategory.ads,
+              'ad_load_retries_exhausted',
+              error: error,
+              payload: {'attempts': _maxLoadAttempts},
+            );
+            _loadAttempts = 0;
           },
         ),
       );
-    } catch (e) {
-      AppLogger.instance.error(
+    } catch (e, stackTrace) {
+      // An exception here is not "no fill": the request itself broke.
+      _telemetry.fail(
         AppLogCategory.ads,
-        '[AdService] Exception loading ad',
+        'ad_load_failed',
         error: e,
+        stackTrace: stackTrace,
+        payload: {'attempt': _loadAttempts},
       );
       _isLoading = false;
       _isAdReady = false;
@@ -242,17 +266,15 @@ class AdService {
       }
 
       return rewardEarned;
-    } catch (e) {
-      AppLogger.instance.error(
-        AppLogCategory.ads,
-        '[AdService] Exception showing ad',
-        error: e,
-      );
-
+    } catch (e, stackTrace) {
+      // The AppLogger.error that used to sit here produced a second crash
+      // report for the same exception, because error-level logs are
+      // reported too.
       _telemetry.fail(
         AppLogCategory.ads,
         'rewarded_ad_completed',
         error: e,
+        stackTrace: stackTrace,
         payload: {
           'ad_network': 'admob',
           'failure_reason': 'exception_${e.runtimeType}',

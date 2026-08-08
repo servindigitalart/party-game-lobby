@@ -174,6 +174,8 @@ Trigger telemetry.
 
 Controllers should remain lightweight.
 
+Progression controllers are read-only: see "Progression" below.
+
 ---
 
 ## Repositories
@@ -478,6 +480,56 @@ Cloud Functions
 AI-powered features
 
 Without major rewrites.
+
+---
+
+# Progression
+
+Progression is **server-authoritative**. The client cannot grant itself XP,
+levels, achievements, avatars, titles or leaderboard positions, and
+`firestore.rules` denies every one of those writes.
+
+```
+rooms/{code}  phase → finalWinner
+        ↓  Firestore trigger (functions/src/progression/onMatchCompleted.ts)
+   claim matchCompletions/{roomCode}      ← idempotency, in Firestore
+        ↓
+   ProgressionService    XP + stats + achievements + avatars (one transaction)
+   TitleService          users/{uid}/unlockedTitles
+   LeaderboardService    leaderboards/{type}/entries and /{week}
+        ↓
+   matchCompletions/{roomCode}.status = completed, with the awards granted
+```
+
+## Why a trigger
+
+A callable would let a client choose when progression runs, how often, and
+with what numbers. The trigger reads the room document, whose writes are
+already constrained by the room rules.
+
+## Idempotency
+
+Firestore triggers are at-least-once. The claim document is created inside a
+transaction and fails if it already exists, so a redelivered event awards
+nothing. The claim is written *before* any award: a crash mid-way leaves the
+match claimed and un-retried, because a partially applied progression is
+preferable to a doubled one. `status` records what happened.
+
+## What the client may still do
+
+Read its profile, read leaderboards and titles, select an avatar it already
+owns, and equip a title the server already granted. Nothing else.
+
+`ProgressionController`, `TitleController` and `LeaderboardController` are
+read-only; their write methods were deleted rather than left to fail with
+permission-denied.
+
+## Unlock rules
+
+`shared/progression_catalog.json` is the single source. Both the server rule
+tables and the client's `ProgressionRules` are generated from it by
+`tool/generate_catalog.py`. Only the server grants; the client copy exists so
+the UI can draw progress toward the next unlock.
 
 ---
 

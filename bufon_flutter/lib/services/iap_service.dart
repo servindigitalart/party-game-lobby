@@ -1,5 +1,6 @@
 // services/iap_service.dart
 import 'dart:async';
+import '../core/logging/log_level.dart';
 import '../core/telemetry/game_telemetry_service.dart';
 import 'dart:io';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -51,10 +52,14 @@ class IAPService {
       final response = await _iap.queryProductDetails(productIds);
 
       if (response.error != null) {
-        AppLogger.instance.error(
+        // No products means the paywall can only offer the ad path. The
+        // store is often unreachable on a cold or offline start, so this is
+        // a warning, not a defect.
+        _telemetry.fail(
           AppLogCategory.purchases,
-          '[IAPService] Error querying products',
-          error: response.error,
+          'purchase_products_unavailable',
+          error: response.error!,
+          severity: AppLogLevel.warning,
         );
         return;
       }
@@ -68,11 +73,14 @@ class IAPService {
       // Listen to purchase updates
       _subscription = _iap.purchaseStream.listen(
         _onPurchaseUpdate,
-        onError: (error) {
-          AppLogger.instance.error(
+        onError: (Object error, StackTrace stackTrace) {
+          // The stream is the only channel through which a completed
+          // purchase arrives; if it breaks, purchases silently stop.
+          _telemetry.fail(
             AppLogCategory.purchases,
-            '[IAPService] Purchase stream error',
+            'purchase_stream_failed',
             error: error,
+            stackTrace: stackTrace,
           );
         },
       );
@@ -81,11 +89,16 @@ class IAPService {
         AppLogCategory.purchases,
         '[IAPService] Initialized successfully',
       );
-    } catch (e) {
-      AppLogger.instance.error(
+    } catch (e, stackTrace) {
+      // The store being unreachable is recoverable — the paywall falls back
+      // to the ad path — but it silently removes the only revenue route, so
+      // it stays visible as a warning breadcrumb.
+      _telemetry.fail(
         AppLogCategory.purchases,
-        '[IAPService] Failed to initialize',
+        'purchase_service_init_failed',
         error: e,
+        stackTrace: stackTrace,
+        severity: AppLogLevel.warning,
       );
     }
   }
@@ -124,10 +137,16 @@ class IAPService {
         // Complete the purchase
         await _iap.completePurchase(purchase);
       } else if (purchase.status == PurchaseStatus.error) {
-        AppLogger.instance.error(
+        // Store-side rejection: declined card, cancelled sheet, region
+        // restriction. Expected in a purchase funnel, so it stays a warning
+        // and rides on purchase_completed's failure status rather than
+        // becoming a second event.
+        _telemetry.fail(
           AppLogCategory.purchases,
-          '[IAPService] Purchase error',
-          error: purchase.error,
+          'purchase_completed',
+          error: purchase.error ?? Exception('store rejected the purchase'),
+          severity: AppLogLevel.warning,
+          payload: {'failure_reason': purchase.error?.code ?? 'store_error'},
         );
       }
     }
@@ -139,11 +158,14 @@ class IAPService {
       // This is called automatically from purchaseStream
       // The actual verification happens in buyNightPass
       return true;
-    } catch (e) {
-      AppLogger.instance.error(
+    } catch (e, stackTrace) {
+      // The player may have been charged and not received the pass: never
+      // downgrade this one.
+      _telemetry.fail(
         AppLogCategory.purchases,
-        '[IAPService] Verification error',
+        'purchase_verification_failed',
         error: e,
+        stackTrace: stackTrace,
       );
       return false;
     }
@@ -263,17 +285,26 @@ class IAPService {
         return true;
       } else {
         final error = data['error'] as String? ?? 'Unknown error';
-        AppLogger.instance.error(
+        // Server-side receipt validation refused a purchase the store
+        // accepted: the player may have been charged without receiving the
+        // pass, so this is never downgraded.
+        _telemetry.fail(
           AppLogCategory.purchases,
-          '[IAPService] Verification failed: $error',
+          'purchase_verification_rejected',
+          error: Exception(error),
+          payload: {'failure_reason': error},
         );
         return false;
       }
-    } catch (e) {
-      AppLogger.instance.error(
+    } catch (e, stackTrace) {
+      // Reuses the purchase_completed event with a failed status, so the
+      // funnel counts one action with two outcomes instead of two events.
+      _telemetry.fail(
         AppLogCategory.purchases,
-        '[IAPService] Purchase failed',
+        'purchase_completed',
         error: e,
+        stackTrace: stackTrace,
+        payload: {'failure_reason': 'exception_${e.runtimeType}'},
       );
       return false;
     }
@@ -310,11 +341,12 @@ class IAPService {
         AppLogCategory.purchases,
         '[IAPService] Purchases restored',
       );
-    } catch (e) {
-      AppLogger.instance.error(
+    } catch (e, stackTrace) {
+      _telemetry.fail(
         AppLogCategory.purchases,
-        '[IAPService] Failed to restore purchases',
+        'purchase_restore_failed',
         error: e,
+        stackTrace: stackTrace,
       );
     }
   }

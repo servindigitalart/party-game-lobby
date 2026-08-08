@@ -1,5 +1,6 @@
 // data/repositories/room_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../models/room.dart';
 import '../../models/player.dart';
@@ -28,10 +29,19 @@ import '../../core/telemetry/telemetry_context.dart';
 /// transition is reported twice.
 class RoomRepository {
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions? _injectedFunctions;
   final GameTelemetryService _telemetry = GameTelemetryService.instance;
 
-  RoomRepository({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  RoomRepository({FirebaseFirestore? firestore, FirebaseFunctions? functions})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _injectedFunctions = functions;
+
+  /// Resolved lazily: `FirebaseFunctions.instance` throws until
+  /// `Firebase.initializeApp` has run, and this repository is constructed by
+  /// a provider that may be read earlier — and by tests that never start
+  /// Firebase at all.
+  FirebaseFunctions get _functions =>
+      _injectedFunctions ?? FirebaseFunctions.instance;
 
   // Last values seen through watchRoom, so a transition is reported once even
   // when several widgets subscribe to the same room.
@@ -89,130 +99,76 @@ class RoomRepository {
   Future<T> _write<T>(String operation, Future<T> Function() body) =>
       _firestoreOp('write', operation, body);
 
-  /// Submit a vote using an atomic transaction
+  Future<T> _callable<T>(String operation, Future<T> Function() body) =>
+      _firestoreOp('callable', operation, body);
+
+  /// Submits a vote through the `submitVote` Cloud Function.
   ///
-  /// Updates only the specific player documents involved
+  /// This used to be a client-side transaction that wrote `votedFor` on the
+  /// voter and `score + 100` on the target. Firestore rules cannot require
+  /// two document writes to happen together, so the score write had to be
+  /// allowed on its own — and a client that never voted could replay it
+  /// without limit, forging XP, wins, titles and leaderboard rank through
+  /// onMatchCompleted, which trusts `score`.
   ///
-  /// Validations:
-  /// - Room must exist
-  /// - Game phase must be voting
-  /// - Voter must not have already voted
-  /// - Cannot vote for yourself
-  /// - Voted-for player must exist
+  /// The client now sends only the room and the chosen player. Every
+  /// precondition — membership, phase, single vote, target exists and
+  /// answered — is checked server-side against state the client cannot
+  /// influence, and both writes happen in one Admin SDK transaction.
   ///
   /// Throws:
   /// - [VotingException] if validation fails
-  /// - [RoomException] if room doesn't exist
+  /// - [RoomException] if the call itself fails
   Future<void> submitVoteTransaction(
     String roomCode,
     String voterId,
     String votedForId,
   ) async {
-    final roomRef = _firestore.collection('rooms').doc(roomCode);
-    final voterRef = _playersCollection(roomCode).doc(voterId);
-    final votedForRef = _playersCollection(roomCode).doc(votedForId);
-
     final voteStartTime = DateTime.now();
 
     try {
-      await _transaction('submit_vote', () async {
-        return await _firestore.runTransaction((transaction) async {
-          // Get room to validate phase
-          final roomSnapshot = await transaction.get(roomRef);
-          if (!roomSnapshot.exists) {
-            throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
-          }
-
-          final roomData = roomSnapshot.data();
-          if (roomData == null) {
-            throw RoomException('Room data is null', code: 'INVALID_ROOM_DATA');
-          }
-
-          final room = Room.fromJson(roomData);
-
-          // Validate game phase
-          if (room.phase != GamePhase.voting) {
-            throw VotingException(
-              'Voting is not allowed in current game phase: ${room.phase.name}',
-              code: 'INVALID_PHASE',
-            );
-          }
-
-          // Get voter
-          final voterSnapshot = await transaction.get(voterRef);
-          if (!voterSnapshot.exists) {
-            throw VotingException(
-              'Voter not found in room',
-              code: 'VOTER_NOT_FOUND',
-            );
-          }
-
-          final voter = Player.fromJson(voterSnapshot.data()!);
-
-          // Check if already voted
-          if (voter.votedFor != null) {
-            throw VotingException(
-              'You have already voted',
-              code: 'ALREADY_VOTED',
-            );
-          }
-
-          // Validate not voting for self
-          if (voterId == votedForId) {
-            throw VotingException(
-              'Cannot vote for yourself',
-              code: 'SELF_VOTE_FORBIDDEN',
-            );
-          }
-
-          // Get voted-for player
-          final votedForSnapshot = await transaction.get(votedForRef);
-          if (!votedForSnapshot.exists) {
-            throw VotingException(
-              'Voted-for player not found in room',
-              code: 'VOTED_FOR_NOT_FOUND',
-            );
-          }
-
-          final votedForPlayer = Player.fromJson(votedForSnapshot.data()!);
-          if (votedForPlayer.currentAnswer == null ||
-              votedForPlayer.currentAnswer!.trim().isEmpty) {
-            throw VotingException(
-              'Cannot vote for a player without an answer',
-              code: 'VOTED_FOR_HAS_NO_ANSWER',
-            );
-          }
-
-          // Update voter: mark as voted
-          transaction.update(voterRef, {'votedFor': votedForId});
-
-          // Update voted-for player: increment score
-          transaction.update(votedForRef, {
-            'score': votedForPlayer.score + 100,
-          });
-        });
+      await _callable('submit_vote', () async {
+        // voterId is not sent: the function uses the verified auth uid, so a
+        // client cannot vote on someone else's behalf.
+        return _functions.httpsCallable('submitVote').call<Map<String, dynamic>>(
+          {'roomCode': roomCode, 'votedForId': votedForId},
+        );
       });
+    } on FirebaseFunctionsException catch (e) {
+      throw _votingFailure(e);
+    }
 
-      // Round, room code and player count already travel in Session Context,
-      // refreshed from the room snapshot. Reading the room back from
-      // Firestore here — one extra document read on the hot voting path,
-      // once per player per round — existed only to fill an analytics
-      // parameter and is gone.
-      _telemetry.track(
-        AppLogCategory.voting,
-        'vote_submitted',
-        payload: {
-          'time_to_vote_seconds': DateTime.now()
-              .difference(voteStartTime)
-              .inSeconds,
-        },
-      );
-    } on FirebaseException catch (e) {
-      throw RoomException(
-        'Firebase error during vote: ${e.message}',
-        code: e.code,
+    // Round, room code and player count already travel in Session Context.
+    _telemetry.track(
+      AppLogCategory.voting,
+      'vote_submitted',
+      payload: {
+        'time_to_vote_seconds': DateTime.now()
+            .difference(voteStartTime)
+            .inSeconds,
+      },
+    );
+  }
+
+  /// Maps the callable's failure back onto the domain exceptions the UI
+  /// already renders messages for.
+  GameException _votingFailure(FirebaseFunctionsException error) {
+    final code = (error.details is Map)
+        ? (error.details as Map)['code'] as String?
+        : null;
+
+    if (code == null) {
+      // Transport, timeout or an unhandled server error: not domain control
+      // flow, so it stays a RoomException and is reported as such.
+      return RoomException(
+        error.message ?? 'No pudimos registrar tu voto.',
+        code: error.code,
       );
     }
+    return VotingException(
+      error.message ?? 'No pudimos registrar tu voto.',
+      code: code,
+    );
   }
 
   /// Get a room by code (with players from subcollection)

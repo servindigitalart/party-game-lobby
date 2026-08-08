@@ -1,9 +1,9 @@
 // domain/controllers/leaderboard_controller.dart
 import '../../data/repositories/leaderboard_repository.dart';
+import '../../core/logging/log_level.dart';
 import '../../core/logging/log_category.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import '../../models/leaderboard_entry.dart';
-import '../../models/user_profile.dart';
 import '../../core/exceptions.dart';
 
 /// Controller for leaderboard operations
@@ -19,55 +19,6 @@ class LeaderboardController {
 
   LeaderboardController({LeaderboardRepository? repository})
     : _repository = repository ?? LeaderboardRepository();
-
-  /// Update all leaderboards after game completion
-  ///
-  /// Called by ProgressionController after processing game progression
-  /// Updates global XP and all weekly leaderboards in a batch
-  Future<void> updateLeaderboardsAfterGame({
-    required String uid,
-    required String nickname,
-    required String avatarId,
-    required int xp,
-    required int level,
-    required int xpGained,
-    required int winsGained,
-    required int votesGained,
-  }) async {
-    try {
-      // Update global XP leaderboard
-      await _repository.updateGlobalXP(
-        uid: uid,
-        nickname: nickname,
-        avatarId: avatarId,
-        xp: xp,
-        level: level,
-      );
-
-      // Update weekly leaderboards in a batch
-      await _repository.updateWeeklyStats(
-        uid: uid,
-        nickname: nickname,
-        avatarId: avatarId,
-        level: level,
-        xpGained: xpGained,
-        winsGained: winsGained,
-        votesGained: votesGained,
-      );
-
-      _telemetry.track(
-        AppLogCategory.leaderboard,
-        'leaderboards_updated',
-        payload: {
-          'xp_gained': xpGained,
-          'wins_gained': winsGained,
-          'votes_gained': votesGained,
-        },
-      );
-    } catch (e) {
-      throw GameException('Failed to update leaderboards: $e');
-    }
-  }
 
   /// Fetch top players for a specific leaderboard
   ///
@@ -91,7 +42,10 @@ class LeaderboardController {
       );
 
       return entries;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      _readFailed('leaderboard_fetch_failed', e, stackTrace, {
+        'type': type.name,
+      });
       throw GameException('Failed to fetch top players: $e');
     }
   }
@@ -119,9 +73,34 @@ class LeaderboardController {
       }
 
       return entry;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      _readFailed('leaderboard_rank_fetch_failed', e, stackTrace, {
+        'type': type.name,
+      });
       throw GameException('Failed to fetch user rank: $e');
     }
+  }
+
+  /// Records a failed leaderboard read.
+  ///
+  /// These run inside FutureProviders, which Riverpod rebuilds and retries.
+  /// Warning severity keeps a player refreshing a leaderboard offline from
+  /// turning into a stream of identical crash reports, while the breadcrumb
+  /// still explains an empty screen.
+  void _readFailed(
+    String event,
+    Object error,
+    StackTrace stackTrace,
+    Map<String, dynamic> payload,
+  ) {
+    _telemetry.fail(
+      AppLogCategory.leaderboard,
+      event,
+      error: error,
+      stackTrace: stackTrace,
+      severity: AppLogLevel.warning,
+      payload: payload,
+    );
   }
 
   /// Get current week key (for display purposes)
@@ -129,24 +108,4 @@ class LeaderboardController {
     return _repository.getCurrentWeekKey();
   }
 
-  /// Helper to update leaderboards from UserProfile
-  ///
-  /// Convenience method that extracts data from UserProfile
-  Future<void> updateLeaderboardsFromProfile({
-    required UserProfile profile,
-    required int xpGained,
-    required int winsGained,
-    required int votesGained,
-  }) async {
-    await updateLeaderboardsAfterGame(
-      uid: profile.uid,
-      nickname: 'Jugador', // Default - will be overridden by actual nickname
-      avatarId: profile.selectedAvatar,
-      xp: profile.xp,
-      level: profile.level,
-      xpGained: xpGained,
-      winsGained: winsGained,
-      votesGained: votesGained,
-    );
-  }
 }

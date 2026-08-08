@@ -1,5 +1,6 @@
 // presentation/screens/paywall_screen.dart
 import 'package:flutter/material.dart';
+import '../../core/logging/log_level.dart';
 import '../../core/logging/log_category.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,7 +91,17 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       } else {
         _showError('No se completó el anuncio. Intenta de nuevo.');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // AdService and RoomRepository already report whatever broke below.
+      // Warning severity records the outcome the player actually saw
+      // without producing a second crash report for one failure.
+      _telemetry.fail(
+        AppLogCategory.ads,
+        'ad_unlock_flow_failed',
+        error: e,
+        stackTrace: stackTrace,
+        severity: AppLogLevel.warning,
+      );
       if (mounted) {
         _showError('Error al mostrar el anuncio: $e');
       }
@@ -135,7 +146,15 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       } else {
         _showError('La compra no se completó. Intenta de nuevo.');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // See _watchAd: IAPService owns the purchase failure report.
+      _telemetry.fail(
+        AppLogCategory.purchases,
+        'purchase_flow_failed',
+        error: e,
+        stackTrace: stackTrace,
+        severity: AppLogLevel.warning,
+      );
       if (mounted) {
         _showError('Error al procesar la compra: $e');
       }

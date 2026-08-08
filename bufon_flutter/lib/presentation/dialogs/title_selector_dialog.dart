@@ -197,12 +197,30 @@ class TitleSelectorDialog extends ConsumerWidget {
 
             if (userId == null) return;
 
-            if (title == null) {
-              // Unequip title
-              await controller.unequipTitle(uid: userId);
-            } else {
-              // Equip title
-              await controller.equipTitle(uid: userId, titleId: title.id);
+            // This had no catch: the exception escaped an async onTap into
+            // the guarded zone and was reported as a *fatal* crash, while
+            // the dialog closed as if the title had been equipped.
+            try {
+              if (title == null) {
+                await controller.unequipTitle(uid: userId);
+              } else {
+                await controller.equipTitle(uid: userId, titleId: title.id);
+              }
+            } catch (e) {
+              // TitleController already recorded the failure; this only
+              // tells the player, and must not report it a second time.
+              HapticService.error();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'No pudimos cambiar tu título. Intenta de nuevo.',
+                    ),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+              return;
             }
 
             if (context.mounted) {

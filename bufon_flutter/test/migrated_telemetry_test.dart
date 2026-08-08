@@ -190,6 +190,47 @@ void main() {
     });
   });
 
+  group('build metadata enriches everything with no manual wiring', () {
+    test('app version and build number reach every event once resolved', () {
+      // package_info_plus resolves asynchronously, so simulate the moment it
+      // lands rather than waiting on a platform channel in a unit test.
+      telemetry.updateContext({
+        TelemetryKeys.appVersion: '1.2.3',
+        TelemetryKeys.buildNumber: '42',
+      });
+
+      telemetry.track(AppLogCategory.app, 'app_started');
+
+      final context = recorder.named('app_started').context;
+      expect(context[TelemetryKeys.appVersion], '1.2.3');
+      expect(context[TelemetryKeys.buildNumber], '42');
+    });
+
+    test('build metadata is forwarded to analytics', () {
+      // Without this a crash or an event cannot be attributed to a build,
+      // which is the first question when triaging a beta.
+      expect(analyticsContextKeys, contains(TelemetryKeys.appVersion));
+      expect(analyticsContextKeys, contains(TelemetryKeys.buildNumber));
+    });
+
+    test('build metadata survives a session ending', () {
+      telemetry.updateContext({
+        TelemetryKeys.appVersion: '1.2.3',
+        TelemetryKeys.buildNumber: '42',
+      });
+      telemetry.startSession();
+      telemetry.endSession();
+      recorder.clear();
+
+      // endSession resets to device context; build metadata is device-level
+      // and must not be lost with the session.
+      telemetry.track(AppLogCategory.app, 'app_started');
+      final context = recorder.named('app_started').context;
+      expect(context[TelemetryKeys.appVersion], '1.2.3');
+      expect(context[TelemetryKeys.buildNumber], '42');
+    });
+  });
+
   group('payload discipline', () {
     test('migrated events do not repeat Session Context in the payload', () {
       telemetry.updateContext({TelemetryKeys.roomCode: 'ABCD12'});

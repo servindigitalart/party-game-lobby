@@ -1,5 +1,6 @@
 // domain/controllers/season_controller.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/logging/log_level.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import '../../models/season.dart';
 import '../../models/leaderboard_entry.dart';
@@ -24,12 +25,8 @@ class SeasonController {
       if (querySnapshot.docs.isEmpty) return null;
 
       return Season.fromFirestore(querySnapshot.docs.first);
-    } catch (e) {
-      AppLogger.instance.error(
-        AppLogCategory.firestore,
-        'Error getting current season',
-        error: e,
-      );
+    } catch (e, stackTrace) {
+      _readFailed('season_fetch_failed', e, stackTrace, const {});
       return null;
     }
   }
@@ -38,6 +35,29 @@ class SeasonController {
     final season = await getCurrentSeason();
     if (season == null || season.isEnded) return null;
     return season.timeRemaining;
+  }
+
+  /// Records a failed season read.
+  ///
+  /// These used to be `AppLogger.error`, which CrashLogDestination turns
+  /// into a non-fatal crash report. A season lookup failing while the player
+  /// is offline is expected and recoverable — the screen falls back to no
+  /// season — so it is a warning now. This removes reports rather than
+  /// adding them.
+  void _readFailed(
+    String event,
+    Object error,
+    StackTrace stackTrace,
+    Map<String, dynamic> payload,
+  ) {
+    _telemetry.fail(
+      AppLogCategory.season,
+      event,
+      error: error,
+      stackTrace: stackTrace,
+      severity: AppLogLevel.warning,
+      payload: payload,
+    );
   }
 
   Future<void> finalizeSeason(String seasonId) async {
@@ -307,13 +327,8 @@ class SeasonController {
       return snapshot.docs
           .map((doc) => SeasonHistory.fromFirestore(doc))
           .toList();
-    } catch (e) {
-      AppLogger.instance.error(
-        AppLogCategory.firestore,
-        'Error getting user season history',
-        context: {'userId': userId},
-        error: e,
-      );
+    } catch (e, stackTrace) {
+      _readFailed('season_history_fetch_failed', e, stackTrace, const {});
       return [];
     }
   }
@@ -330,13 +345,10 @@ class SeasonController {
       if (!historyDoc.exists) return null;
 
       return historyDoc.data()?['rank'] as int?;
-    } catch (e) {
-      AppLogger.instance.error(
-        AppLogCategory.firestore,
-        'Error getting user season rank',
-        context: {'userId': userId, 'seasonId': seasonId},
-        error: e,
-      );
+    } catch (e, stackTrace) {
+      _readFailed('season_rank_fetch_failed', e, stackTrace, {
+        'season_id': seasonId,
+      });
       return null;
     }
   }

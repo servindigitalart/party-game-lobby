@@ -16,7 +16,15 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "verify": "node tool/release.mjs",
+    "release": "node tool/release.mjs --deploy",
+    "release:ci": "node tool/release.mjs --deploy --yes",
+    "test:flutter": "cd bufon_flutter && flutter test",
+    "test:functions": "npm --prefix functions test",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-bufon \"npm --prefix firestore-tests test\"",
+    "test:integration": "firebase emulators:exec --only firestore,functions,auth --project demo-bufon \"node --test functions/integration.test.mjs\"",
+    "catalog:generate": "python3 tool/generate_catalog.py"
   },
   "eslintConfig": {
     "extends": [
