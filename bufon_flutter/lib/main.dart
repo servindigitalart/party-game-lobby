@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -40,15 +41,15 @@ void main() {
     final telemetry = GameTelemetryService.instance;
     telemetry.init();
 
-    // Set system UI overlay style for dark theme
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: Color(0xFF111111),
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-    );
+    // System UI overlay style is no longer set globally. Fase 2A gives each
+    // screen a phase register (PhaseScope), and each register carries its own
+    // status/navigation bar styling — a single global dark style contradicted
+    // the screens that render on Paper.
+
+    // The bundled brand fonts ship under the SIL Open Font License, which
+    // requires the licence text to travel with the software. Registering it
+    // here surfaces it in Flutter's own "view licences" page.
+    LicenseRegistry.addLicense(_brandFontLicenses);
 
     // Lock to portrait mode
     await SystemChrome.setPreferredOrientations([
@@ -100,6 +101,11 @@ void main() {
   });
 }
 
+Stream<LicenseEntry> _brandFontLicenses() async* {
+  final license = await rootBundle.loadString('assets/fonts/OFL.txt');
+  yield LicenseEntryWithLineBreaks(const ['PlusJakartaSans'], license);
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -108,11 +114,17 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'BUFÓN',
       debugShowCheckedModeBanner: false,
-      // Fase 3A: AppTheme.darkTheme now means the new Butter Bliss dark
-      // theme (unused until screens migrate, see BUFON_DESIGN_SYSTEM.md
-      // Capítulo 35). The app keeps running on the untouched legacy theme
-      // here until then.
-      theme: AppTheme.legacyTheme,
+      // Fase 2A: the app's identity is the Butter Bliss system, not the
+      // legacy casino theme. `themeMode` is pinned to light on purpose —
+      // light and dark are not a user preference in Bufón, they are the two
+      // emotional *registers* the design system defines (Capítulo 29/30:
+      // Paper is "the social life around the game", Graphite is "the game
+      // live"). Screens that belong to the Graphite register declare it
+      // themselves through `PhaseScope`, which is the only thing allowed to
+      // switch registers.
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.light,
       home: const HomeScreen(),
     );
   }

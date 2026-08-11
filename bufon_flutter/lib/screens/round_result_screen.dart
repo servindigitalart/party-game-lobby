@@ -4,14 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/game_copy.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_elevation.dart';
+import '../core/theme/app_shapes.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/theme/bufon_phase.dart';
+import '../core/theme/motion_tokens.dart';
+import '../core/theme/reduced_motion.dart';
 import '../models/game_phase.dart';
+import '../models/player.dart';
 import '../providers/game_providers.dart';
 import '../core/telemetry/game_telemetry_service.dart';
 import '../core/logging/log_category.dart';
+import '../presentation/transitions/keyhole_reveal_transition.dart';
+import '../presentation/widgets/animated_primary_button.dart';
 import '../presentation/widgets/confetti_widget.dart';
 import '../services/haptic_service.dart';
+import '../presentation/navigation/page_transitions.dart';
 import '../services/sound_service.dart';
 import 'final_winner_screen.dart';
 import 'game_screen.dart';
@@ -23,18 +32,43 @@ class RoundResultScreen extends ConsumerStatefulWidget {
   ConsumerState<RoundResultScreen> createState() => _RoundResultScreenState();
 }
 
-class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
+class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
+    with SingleTickerProviderStateMixin {
   int _revealStage = 0;
   final List<Timer> _revealTimers = [];
+
+  /// Drives the "mirilla" mask (`BRAND PHYSICS`: "el reveal como mirilla").
+  /// The keyhole cut into the isotype's hat bells means "this holds a secret
+  /// until it decides to reveal it", which is literally this screen's job.
+  /// The transition widget has existed since commit ca79281 and had never
+  /// rendered a frame; this is what drives it.
+  late final AnimationController _keyholeController;
+
+  /// The curved view of [_keyholeController] handed to the transition.
+  /// Separate field so it is disposed explicitly — a [CurvedAnimation] keeps
+  /// a listener on its parent.
+  late final CurvedAnimation _keyholeProgress;
 
   @override
   void initState() {
     super.initState();
     GameTelemetryService.instance.transition('round_result');
+    _keyholeController = AnimationController(
+      // Capítulo 17, tier Dramática — one stage of a Reveal.
+      duration: MotionDurations.revealStage,
+      vsync: this,
+    );
+    _keyholeProgress = CurvedAnimation(
+      parent: _keyholeController,
+      curve: MotionCurves.reveal,
+    );
     _revealTimers.add(
       Timer(const Duration(milliseconds: 750), () {
         if (!mounted) return;
         setState(() => _revealStage = 1);
+        // An opening, not a spring: easeOut suits an unveiling, whereas the
+        // compress/release pair belongs to touch feedback.
+        _keyholeController.forward();
         HapticService.lightImpact();
         SoundService.reveal();
       }),
@@ -54,6 +88,8 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
     for (final timer in _revealTimers) {
       timer.cancel();
     }
+    _keyholeProgress.dispose();
+    _keyholeController.dispose();
     super.dispose();
   }
 
@@ -119,7 +155,12 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
     final roomAsync = ref.watch(roomStreamProvider);
     final userId = ref.watch(userIdProvider);
 
-    return roomAsync.when(
+    // `context` here sits *above* the PhaseScope this method returns, so
+    // `context.phase` would still read `legacy`. The register is named
+    // directly instead; every descendant below the scope uses `context.phase`.
+    const phase = BufonPhase.reveal;
+
+    final content = roomAsync.when(
       data: (room) {
         if (room == null) {
           return const Scaffold(
@@ -135,9 +176,7 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
 
         if (room.phase == GamePhase.answering) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const GameScreen()),
-            );
+            context.replaceFadeSlide(const GameScreen());
           });
         } else if (room.phase == GamePhase.finalWinner) {
           final sortedPlayers = List.from(room.players)
@@ -155,15 +194,24 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
           // forbids those writes outright.
 
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (_) => FinalWinnerScreen(
-                  winnerName: winner.name,
-                  winnerAvatarId: 'default',
-                  votesReceived: votesReceived,
-                  totalScore: winner.score,
-                  isCurrentUserWinner: winner.id == userId,
-                ),
+            context.replaceFadeSlide(
+              FinalWinnerScreen(
+                winnerName: winner.name,
+                // The winner's own equipped avatar can only be resolved by
+                // the winner's own device: firestore.rules restricts
+                // /users/{uid} reads to `request.auth.uid == userId`, so a
+                // non-winner cannot read it and the client cannot be given
+                // it here. FinalWinnerScreen therefore shows the default
+                // avatar for *every* winner — the per-viewer fallback this
+                // comment previously claimed existed does not: that screen
+                // does a flat `Avatars.all.firstWhere` on this id, with no
+                // profile lookup. Unblocking needs a product decision
+                // (denormalise the equipped avatar onto the room's player
+                // doc, or relax the rule); see PHASE_2A_RECOVERY_REPORT.md.
+                winnerAvatarId: 'default',
+                votesReceived: votesReceived,
+                totalScore: winner.score,
+                isCurrentUserWinner: winner.id == userId,
               ),
             );
           });
@@ -178,7 +226,9 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
           }
         }
 
-        final sortedPlayers = List.from(room.players)
+        // Spread rather than `List.from`, which erases to `List<dynamic>` —
+        // the scoreboard is its own widget now and needs a real element type.
+        final sortedPlayers = [...room.players]
           ..sort((a, b) => b.score.compareTo(a.score));
 
         final roundSortedPlayers = List.from(room.players)
@@ -195,17 +245,16 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
         final votesReceived = voteCounts[winner.id] ?? 0;
 
         return Scaffold(
-          backgroundColor: AppColors.background,
+          // Surfaces come from the register's ThemeData now (Graphite), not
+          // from the legacy casino palette.
           appBar: AppBar(
-            backgroundColor: AppColors.surface,
             title: Text('Resultados - Ronda ${room.currentRound}'),
-            centerTitle: true,
           ),
           body: Stack(
             children: [
               ConfettiWidget(
                 isActive: _revealStage >= 2,
-                duration: Duration(milliseconds: 1800),
+                tier: ConfettiTier.round,
               ),
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
@@ -230,87 +279,65 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
                         answer: winningAnswer,
                         votesReceived: votesReceived,
                         revealStage: _revealStage,
+                        keyholeProgress: _keyholeProgress,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'Marcador de la noche',
-                      style: AppTypography.h4.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: sortedPlayers.length,
-                        itemBuilder: (context, index) {
-                          final player = sortedPlayers[index];
-                          final position = index + 1;
-                          final roundVotes = voteCounts[player.id] ?? 0;
 
-                          return Card(
-                            color: position == 1
-                                ? AppColors.gold.withValues(alpha: 0.16)
-                                : AppColors.surface,
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: position == 1
-                                    ? AppColors.gold
-                                    : AppColors.primary,
-                                child: Text(
-                                  '$position',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.background,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                player.name,
-                                style: AppTypography.body1.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                '$roundVotes votos esta ronda',
-                                style: AppTypography.caption,
-                              ),
-                              trailing: Text(
-                                '${player.score} pts',
-                                style: AppTypography.body1.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.gold,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                    // THE GATE. The scoreboard's `#1` row identifies the
+                    // winner, so rendering it from stage 0 — as this screen
+                    // did until Fase 2A — let a player read the answer off
+                    // the bottom of the screen during the 800 ms of
+                    // engineered suspense above it. Capítulo 35 Fase 3F's
+                    // acceptance criterion is explicit: "el scoreboard no es
+                    // visible hasta que termina la etapa 2 del reveal."
+                    //
+                    // Not built at all before stage 2, rather than hidden
+                    // with opacity: an invisible widget is still in the
+                    // semantics tree, so a screen-reader user would have had
+                    // the reveal spoiled by a fix that looked correct.
+                    if (_revealStage >= 2) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      Text(
+                        'Marcador de la noche',
+                        style: AppTypography.h4.copyWith(
+                          color: phase.onSurface,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Expanded(
+                        child: _NightScoreboard(
+                          players: sortedPlayers,
+                          voteCounts: voteCounts,
+                        ),
+                      ),
+                    ] else
+                      // Holds the button at the bottom so the spotlight does
+                      // not jump when the scoreboard arrives.
+                      const Spacer(),
                     const SizedBox(height: AppSpacing.md),
                     if (isHost)
-                      ElevatedButton(
+                      AnimatedPrimaryButton(
+                        text: room.currentRound >= room.totalRounds
+                            ? 'Coronar al BUFÓN'
+                            : 'Soltar la siguiente',
                         onPressed: () => _nextRound(room.code),
-                        child: Text(
-                          room.currentRound >= room.totalRounds
-                              ? 'Coronar al BUFÓN'
-                              : 'Soltar la siguiente',
-                        ),
                       )
                     else
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.buttonRadius,
+                          color: AppColors.graphitePlus1,
+                          borderRadius: AppShapes.borderRadiusMd,
+                          border: AppShapes.hairlineBorder(
+                            phase.onSurface.withValues(alpha: 0.12),
                           ),
-                          border: Border.all(color: AppColors.border),
                         ),
                         child: Text(
                           '${GameCopy.nextRound}\nEl host trae la siguiente carta.',
                           textAlign: TextAlign.center,
-                          style: AppTypography.body2,
+                          style: AppTypography.body2.copyWith(
+                            color: phase.onSurfaceMuted,
+                          ),
                         ),
                       ),
                   ],
@@ -325,6 +352,98 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen> {
       error: (error, stack) =>
           Scaffold(body: Center(child: Text('Error: $error'))),
     );
+
+    // Wrapped around `when` rather than around each branch so the loading
+    // and error states inherit the register too — otherwise a slow stream
+    // flashed a differently-themed Scaffold in the middle of a round.
+    return PhaseScope(phase: phase, child: content);
+  }
+}
+
+/// The cumulative night scoreboard.
+///
+/// Extracted from `build` in Fase 2A because it is now conditionally
+/// mounted (see THE GATE) and needs its own entrance — inline, the Arrive
+/// wrapper would have sat three levels deep inside an `if` inside a `Column`.
+/// Presentation only: ordering, scores and vote counts are all computed by
+/// the caller exactly as before.
+class _NightScoreboard extends StatelessWidget {
+  final List<Player> players;
+  final Map<String, int> voteCounts;
+
+  const _NightScoreboard({required this.players, required this.voteCounts});
+
+  @override
+  Widget build(BuildContext context) {
+    final phase = context.phase;
+
+    final list = ListView.builder(
+      itemCount: players.length,
+      itemBuilder: (context, index) {
+        final player = players[index];
+        final position = index + 1;
+        final roundVotes = voteCounts[player.id] ?? 0;
+        final isLeader = position == 1;
+
+        return Card(
+          // `null` falls through to cardTheme (Graphite+1). Only the leader
+          // row is tinted, and with the register's accent rather than the
+          // retired `gold`.
+          color: isLeader ? phase.accent.withValues(alpha: 0.16) : null,
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: isLeader ? phase.accent : AppColors.graphite,
+              child: Text(
+                '$position',
+                style: AppTypography.body2.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isLeader ? phase.onAccent : phase.onSurface,
+                ),
+              ),
+            ),
+            title: Text(
+              player.name,
+              style: AppTypography.body1.copyWith(
+                fontWeight: FontWeight.bold,
+                color: phase.onSurface,
+              ),
+            ),
+            subtitle: Text(
+              '$roundVotes votos esta ronda',
+              style: AppTypography.caption.copyWith(
+                color: phase.onSurfaceMuted,
+              ),
+            ),
+            trailing: Text(
+              '${player.score} pts',
+              style: AppTypography.body1.copyWith(
+                fontWeight: FontWeight.bold,
+                color: phase.accent,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    // Arrive from below (Capítulo 16/23) — the scoreboard enters *after* the
+    // reveal has landed, so it should read as arriving rather than as having
+    // been there all along. Reduced motion gets the end state directly.
+    if (context.reduceMotion) return list;
+
+    return TweenAnimationBuilder<double>(
+      duration: MotionDurations.arrive,
+      curve: MotionCurves.settle,
+      tween: Tween(begin: 1.0, end: 0.0),
+      builder: (context, value, child) => Opacity(
+        opacity: 1 - value,
+        child: Transform.translate(
+          offset: Offset(0, value * AppSpacing.xl),
+          child: child,
+        ),
+      ),
+      child: list,
+    );
   }
 }
 
@@ -334,34 +453,43 @@ class _WinnerSpotlight extends StatelessWidget {
   final int votesReceived;
   final int revealStage;
 
+  /// Drives the keyhole mask over the winning answer. Owned by the screen
+  /// (it is tied to the stage-1 timer), passed down rather than rebuilt here.
+  final Animation<double> keyholeProgress;
+
   const _WinnerSpotlight({
     required this.winnerName,
     required this.answer,
     required this.votesReceived,
     required this.revealStage,
+    required this.keyholeProgress,
   });
 
   @override
   Widget build(BuildContext context) {
+    final phase = context.phase;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        gradient: AppColors.goldGradient,
-        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.35),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        // Flat Graphite+1, not the retired gold gradient: Capítulo 3 ley 1
+        // allows a gradient only in the ceremonial layer (the Ganador de la
+        // Noche screen), and `gold` is not a Butter Bliss colour at all.
+        // What makes this the Protagonist is the accent hairline and the
+        // accent-tinted shadow, per Capítulo 8.
+        color: AppColors.graphitePlus1,
+        borderRadius: AppShapes.borderRadiusXl,
+        border: AppShapes.hairlineBorder(
+          phase.accent.withValues(alpha: 0.45),
+        ),
+        boxShadow: AppElevation.protagonistShadow(phase.accent),
       ),
       child: Column(
         children: [
           Icon(
             revealStage >= 2 ? Icons.theater_comedy : Icons.visibility,
             size: 46,
-            color: AppColors.background,
+            color: phase.accent,
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
@@ -369,7 +497,7 @@ class _WinnerSpotlight extends StatelessWidget {
                 ? 'Y el BUFÓN detrás de eso fue...'
                 : 'La respuesta ganadora fue...',
             style: AppTypography.body1.copyWith(
-              color: AppColors.background,
+              color: phase.onSurface,
               fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
@@ -393,27 +521,52 @@ class _WinnerSpotlight extends StatelessWidget {
                     '...',
                     key: const ValueKey('anticipation'),
                     style: AppTypography.display.copyWith(
-                      color: AppColors.background,
+                      color: phase.onSurfaceMuted,
                     ),
                     textAlign: TextAlign.center,
                   )
-                : Container(
+                // Stage 1: the answer *opens* through the keyhole mask
+                // instead of merely fading in. This is the brand's declared
+                // signature gesture — the isotype's hat bells carry a
+                // keyhole cut meaning "this holds a secret until it decides
+                // to reveal it" — and `KeyholeRevealTransition` had existed
+                // since commit ca79281 without ever rendering a frame.
+                //
+                // The ClipRRect keeps the backdrop's corners on the same
+                // radius as the panel (Capítulo 9: cero esquinas rectas);
+                // without it the mask would open against a square hole.
+                : ClipRRect(
                     key: ValueKey('answer-$answer'),
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: AppColors.background.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(
-                        AppSpacing.buttonRadius,
+                    borderRadius: AppShapes.borderRadiusMd,
+                    child: KeyholeRevealTransition(
+                      // Capítulo 28: a Reveal must have a reduced version.
+                      // Pinning progress to 1.0 skips the mask entirely and
+                      // leaves the AnimatedSwitcher's cross-fade above as the
+                      // whole animation, which is exactly the "cross-fade
+                      // simple" the chapter asks for.
+                      progress: context.motion<Animation<double>>(
+                        full: keyholeProgress,
+                        reduced: const AlwaysStoppedAnimation(1.0),
                       ),
-                    ),
-                    child: Text(
-                      '"$answer"',
-                      style: AppTypography.h4.copyWith(
-                        color: AppColors.background,
-                        fontStyle: FontStyle.italic,
+                      // Darkest tone in the register, so the unopened mask
+                      // reads as a hole in the card rather than a gap.
+                      backdropColor: AppColors.graphiteShade,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: const BoxDecoration(
+                          color: AppColors.graphite,
+                          borderRadius: AppShapes.borderRadiusMd,
+                        ),
+                        child: Text(
+                          '"$answer"',
+                          style: AppTypography.h4.copyWith(
+                            color: phase.onSurface,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ),
           ),
@@ -425,7 +578,7 @@ class _WinnerSpotlight extends StatelessWidget {
                     'Preparando el señalamiento...',
                     key: const ValueKey('author-hidden'),
                     style: AppTypography.body2.copyWith(
-                      color: AppColors.background.withValues(alpha: 0.72),
+                      color: phase.onSurfaceMuted,
                     ),
                     textAlign: TextAlign.center,
                   )
@@ -434,8 +587,12 @@ class _WinnerSpotlight extends StatelessWidget {
                     children: [
                       Text(
                         winnerName,
+                        // The blueprint's `displayButter`: the accent is
+                        // spent on the one word the whole screen exists to
+                        // deliver, and on nothing else (Capítulo 4 — un solo
+                        // protagonista de color por pantalla).
                         style: AppTypography.display.copyWith(
-                          color: AppColors.background,
+                          color: phase.accent,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -443,7 +600,7 @@ class _WinnerSpotlight extends StatelessWidget {
                       Text(
                         '$votesReceived votos recibidos',
                         style: AppTypography.body2.copyWith(
-                          color: AppColors.background,
+                          color: phase.onSurface,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -455,7 +612,7 @@ class _WinnerSpotlight extends StatelessWidget {
             Text(
               GameCopy.roundWinnerPrefix,
               style: AppTypography.caption.copyWith(
-                color: AppColors.background.withValues(alpha: 0.74),
+                color: phase.onSurfaceMuted,
               ),
               textAlign: TextAlign.center,
             ),

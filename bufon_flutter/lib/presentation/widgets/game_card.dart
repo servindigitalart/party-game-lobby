@@ -1,12 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_elevation.dart';
 import '../../core/theme/app_shapes.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/bufon_phase.dart';
 import '../../core/theme/motion_tokens.dart';
+import '../../core/theme/reduced_motion.dart';
+import '../../services/haptic_service.dart';
 
+/// A selectable answer card — the only component on the Voting screen, and
+/// therefore the component that carries the emotional core of the game.
+///
+/// Fase 2A changes, all from BUFON_DESIGN_SYSTEM.md:
+/// - **Flat fill by default** (Capítulo 3 ley 1). The selected state used to
+///   draw a gradient.
+/// - **Register-aware surfaces** instead of the legacy navy: it now reads
+///   the ambient `colorScheme`, so the same card is correct on Graphite
+///   during play and on Paper anywhere else.
+/// - **Legible selected text.** Selected text was forced to `Colors.white`;
+///   on Mint (`#63D6A5`) that measures ≈1.9:1. Capítulo 5 is explicit that
+///   text over a pale brand colour is Ink. [onSelectedColor] makes the
+///   foreground an explicit decision rather than an assumption.
+/// - **Semantics** carrying the *selected* state, which previously existed
+///   only as colour plus an icon.
+/// - **Multi-line answers.** Answers are capped at 100 characters upstream;
+///   a single-line `Row` clipped them at large text scales.
+/// - **Haptics through [HapticService]** and a **reduce-motion** path.
+///
+/// The press/pulse mechanism is untouched: compress fast, release with
+/// overshoot, and a separate confirm pulse on selection (`BRAND PHYSICS`).
 class GameCard extends StatefulWidget {
   final String text;
   final VoidCallback? onTap;
@@ -14,6 +37,14 @@ class GameCard extends StatefulWidget {
   final bool isDisabled;
   final Widget? trailing;
   final Color? selectedColor;
+
+  /// Foreground used while selected. Defaults to Ink, which is legible on
+  /// every pale brand accent (Butter, Mint, Sky, Lavender).
+  final Color? onSelectedColor;
+
+  /// Announced instead of [text] when the raw text is not a useful
+  /// description on its own.
+  final String? semanticLabel;
 
   const GameCard({
     super.key,
@@ -23,6 +54,8 @@ class GameCard extends StatefulWidget {
     this.isDisabled = false,
     this.trailing,
     this.selectedColor,
+    this.onSelectedColor,
+    this.semanticLabel,
   });
 
   @override
@@ -74,8 +107,10 @@ class _GameCardState extends State<GameCard>
   void didUpdateWidget(GameCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isSelected && !oldWidget.isSelected) {
-      _controller.forward().then((_) => _controller.reverse());
-      HapticFeedback.mediumImpact();
+      _controller.forward().then((_) {
+        if (mounted) _controller.reverse();
+      });
+      HapticService.mediumImpact();
     }
   }
 
@@ -99,83 +134,92 @@ class _GameCardState extends State<GameCard>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: _handleTapDown,
-      onTapUp: _handleTapUp,
-      onTapCancel: _handleTapCancel,
-      onTap: widget.isDisabled ? null : widget.onTap,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: widget.isSelected
+    final phase = context.phase;
+    final scheme = Theme.of(context).colorScheme;
+
+    final selectedFill = widget.selectedColor ?? phase.accent;
+    final selectedForeground = widget.onSelectedColor ?? AppColors.ink;
+    final restingForeground = widget.isDisabled
+        ? phase.onSurfaceMuted
+        : phase.onSurface;
+
+    return Semantics(
+      button: widget.onTap != null,
+      enabled: !widget.isDisabled,
+      selected: widget.isSelected,
+      label: widget.semanticLabel ?? widget.text,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTapDown: _handleTapDown,
+        onTapUp: _handleTapUp,
+        onTapCancel: _handleTapCancel,
+        onTap: widget.isDisabled ? null : widget.onTap,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            final target = widget.isSelected
                 ? _pulseAnimation.value
-                : _scaleAnimation.value,
-            child: AnimatedContainer(
-              duration: MotionDurations.settleCard,
-              curve: MotionCurves.settle,
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                gradient: widget.isSelected
-                    ? LinearGradient(
-                        colors: [
-                          widget.selectedColor ?? AppColors.success,
-                          (widget.selectedColor ?? AppColors.success)
-                              .withValues(alpha: 0.7),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: widget.isSelected
-                    ? null
-                    : (widget.isDisabled
-                          ? AppColors.surfaceDark
-                          : AppColors.surface),
-                borderRadius: AppShapes.borderRadiusLg,
-                border: widget.isSelected
-                    ? AppShapes.focusBorder(
-                        widget.selectedColor ?? AppColors.success,
-                      )
-                    : AppShapes.hairlineBorder(AppColors.border),
-                boxShadow: widget.isSelected
-                    ? AppElevation.protagonistShadow(
-                        widget.selectedColor ?? AppColors.success,
-                      )
-                    : AppElevation.ambient,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.text,
-                      style: widget.isSelected
-                          ? AppTypography.body1.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            )
-                          : AppTypography.body1.copyWith(
-                              color: widget.isDisabled
-                                  ? AppColors.textSecondary
-                                  : AppColors.textPrimary,
-                            ),
+                : _scaleAnimation.value;
+            return Transform.scale(
+              scale: context.motion(full: target, reduced: 1.0),
+              child: child,
+            );
+          },
+          child: AnimatedContainer(
+            duration: MotionDurations.settleCard,
+            curve: MotionCurves.settle,
+            constraints: const BoxConstraints(minHeight: AppSpacing.xxl),
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: widget.isSelected
+                  ? selectedFill
+                  : (widget.isDisabled
+                        ? scheme.surface
+                        : scheme.surfaceContainerHighest),
+              borderRadius: AppShapes.borderRadiusLg,
+              border: widget.isSelected
+                  ? AppShapes.focusBorder(selectedFill)
+                  : AppShapes.hairlineBorder(scheme.outline),
+              boxShadow: widget.isSelected
+                  ? AppElevation.protagonistShadow(selectedFill)
+                  : AppElevation.ambient,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.text,
+                    // Answers run to 100 characters; at large accessibility
+                    // text scales a single line clipped them silently.
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.body1.copyWith(
+                      color: widget.isSelected
+                          ? selectedForeground
+                          : restingForeground,
+                      fontWeight: widget.isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
-                  if (widget.trailing != null) ...[
-                    const SizedBox(width: AppSpacing.sm),
-                    widget.trailing!,
-                  ],
-                  if (widget.isSelected)
-                    const Icon(
-                      Icons.check_circle,
-                      color: Colors.white,
-                      size: 24,
-                    ),
+                ),
+                if (widget.trailing != null) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  widget.trailing!,
                 ],
-              ),
+                if (widget.isSelected) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  Icon(
+                    Icons.check_circle,
+                    color: selectedForeground,
+                    size: 24,
+                  ),
+                ],
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

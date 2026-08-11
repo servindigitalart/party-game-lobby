@@ -37,7 +37,10 @@ dependencies:
 
   # UI
   cupertino_icons: ^1.0.8
-  google_fonts: ^6.2.1
+  # google_fonts removed in Fase 2A: it fetched brand typography over HTTP at
+  # runtime, so a cold offline launch rendered the whole app in the platform
+  # default face. The faces are bundled under assets/fonts/ instead — see
+  # AppTypography and docs/design/v1.1/TYPOGRAPHY_AUDIT.md.
 
   # Sharing
   share_plus: ^10.1.2
@@ -68,6 +71,25 @@ flutter:
 
   assets:
     - assets/questions.json
+    # Real brand marks (Capítulo 2). Until Fase 2A these lived in /public —
+    # the leftover Create React App web root — so the shipped app contained
+    # no pixels of its own identity.
+    - assets/brand/isotype.png
+    - assets/brand/wordmark.png
+
+  fonts:
+    # Bundled, not runtime-fetched. Latin subset (verified to cover every
+    # accented character Spanish copy uses) with the three weights the
+    # AppTypography scale actually asks for: 400 normal, 600 w600, 700 bold.
+    # ~90 KB total. Licence: SIL OFL 1.1, see assets/fonts/OFL.txt.
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-400.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-600.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-700.ttf
+          weight: 700
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

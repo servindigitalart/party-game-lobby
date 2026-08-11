@@ -11,14 +11,17 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_elevation.dart';
 import '../core/theme/app_shapes.dart';
 import '../core/theme/app_spacing.dart';
-import '../core/theme/app_theme.dart';
+import '../core/theme/motion_tokens.dart';
+import '../core/theme/bufon_phase.dart';
 import '../core/theme/app_typography.dart';
 import '../core/logging/log_category.dart';
 import '../core/telemetry/game_telemetry_service.dart';
 import '../core/logging/log_level.dart';
 import '../core/telemetry/telemetry_event.dart';
+import '../presentation/navigation/page_transitions.dart';
 import '../presentation/screens/paywall_screen.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../services/haptic_service.dart';
 import 'game_screen.dart';
 import 'home_screen.dart';
 
@@ -32,6 +35,8 @@ class LobbyScreen extends ConsumerStatefulWidget {
 class _LobbyScreenState extends ConsumerState<LobbyScreen> {
   final _telemetry = GameTelemetryService.instance;
   Timer? _cleanupTimer;
+  Timer? _copyResetTimer;
+  bool _codeCopied = false;
 
   @override
   void initState() {
@@ -50,7 +55,18 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
   @override
   void dispose() {
     _cleanupTimer?.cancel();
+    _copyResetTimer?.cancel();
     super.dispose();
+  }
+
+  void _copyRoomCode(String code) {
+    HapticService.selectionClick();
+    Clipboard.setData(ClipboardData(text: code));
+    setState(() => _codeCopied = true);
+    _copyResetTimer?.cancel();
+    _copyResetTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _codeCopied = false);
+    });
   }
 
   Future<void> _performCleanup() async {
@@ -90,15 +106,16 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     // Clear room code
     ref.read(roomCodeProvider.notifier).state = null;
 
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    context.replaceFade(const HomeScreen());
 
     // Show message after navigation
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.orange),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppColors.coral,
+          ),
         );
       }
     });
@@ -145,9 +162,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       // snapshot — neither belongs in the UI layer.
 
       if (context.mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const GameScreen()),
-        );
+        context.replaceFadeSlide(const GameScreen());
       }
     } on MonetizationException catch (e) {
       if (e.code == 'ROOM_LOCKED' && context.mounted) {
@@ -166,7 +181,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_friendlyStartError(e)),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.coral,
           ),
         );
       }
@@ -185,7 +200,8 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       }
       return error.message;
     }
-    return 'Error al iniciar: $error';
+    // Capítulo 26: the technical detail stays in logs, never on screen.
+    return 'No pudimos empezar la partida. Inténtalo de nuevo.';
   }
 
   @override
@@ -208,9 +224,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         // Navigate to game if already started
         if (room.phase != GamePhase.lobby) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const GameScreen()),
-            );
+            context.replaceFadeSlide(const GameScreen());
           });
         }
 
@@ -218,11 +232,11 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         final canStart = room.players.length >= 3;
         final playersNeeded = (3 - room.players.length).clamp(0, 3);
 
-        // Fase 3D: Lobby migrates to the Butter Bliss light register
-        // (Capítulo 33 — "Lobby: Butter, modo claro, lento, expectante"),
-        // scoped to this screen only via a local Theme override.
-        return Theme(
-          data: AppTheme.lightTheme,
+        // Fase 3D put Lobby on the Butter Bliss light register (Capítulo
+        // 33 — "Lobby: Butter, modo claro, lento, expectante"); Fase 2A
+        // moves it from a bare Theme override to PhaseScope.
+        return PhaseScope(
+          phase: BufonPhase.lobby,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Sala de Espera'),
@@ -250,7 +264,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                         Text(
                           'Código de Sala',
                           style: AppTypography.body1.copyWith(
-                            color: AppColors.inkSoft,
+                            color: AppColors.inkMuted,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
@@ -269,19 +283,23 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                                   ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.copy),
-                              color: AppColors.ink,
-                              onPressed: () {
-                                HapticFeedback.selectionClick();
-                                Clipboard.setData(
-                                  ClipboardData(text: room.code),
-                                );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Código copiado'),
-                                  ),
-                                );
-                              },
+                              // Capítulo 18: copying the room code fires an
+                              // icon Swap to a check, "nunca solo un Snackbar
+                              // silencioso" — before Fase 2A the only visual
+                              // confirmation was a toast at the far end of
+                              // the screen.
+                              icon: AnimatedSwitcher(
+                                duration: MotionDurations.swap,
+                                child: Icon(
+                                  _codeCopied ? Icons.check : Icons.copy,
+                                  key: ValueKey(_codeCopied),
+                                  color: _codeCopied
+                                      ? AppColors.mintShade
+                                      : AppColors.ink,
+                                ),
+                              ),
+                              tooltip: 'Copiar código de sala',
+                              onPressed: () => _copyRoomCode(room.code),
                             ),
                           ],
                         ),

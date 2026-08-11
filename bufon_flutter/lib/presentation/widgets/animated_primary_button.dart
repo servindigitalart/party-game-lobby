@@ -1,12 +1,52 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_elevation.dart';
 import '../../core/theme/app_shapes.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/bufon_phase.dart';
 import '../../core/theme/motion_tokens.dart';
+import '../../core/theme/reduced_motion.dart';
+import '../../services/haptic_service.dart';
 import '../../services/sound_service.dart';
+
+/// Bufón's primary action.
+///
+/// Fase 2A changes, all from BUFON_DESIGN_SYSTEM.md:
+/// - **Flat fill by default** (Capítulo 3 ley 1 / Capítulo 34). The gradient
+///   this used to draw on every enabled button was, on its own, most of the
+///   16 `LinearGradient` sites the design system caps at 2-3. A gradient is
+///   still reachable through [variant] for the one ceremonial moment that
+///   earned it (Capítulo 8, capa Ceremonial).
+/// - **Pill shape** (Capítulo 9): the primary button echoes the logotype's
+///   letterforms. `AppShapes.pill` existed and had zero call sites.
+/// - **Phase-aware defaults**: with no explicit colour it now takes the
+///   screen's register accent instead of the legacy casino red, so an
+///   unparameterised instance can no longer render red-on-Paper.
+/// - **Semantics**: it was a bare `GestureDetector` wrapping a `Text`, so
+///   screen readers saw no button at all.
+/// - **Haptics through [HapticService]** instead of calling
+///   `HapticFeedback` directly, which is what makes Capítulo 19's haptic
+///   economy (coalesce/escalate) possible at all.
+/// - **Reduce motion** (Capítulo 28).
+/// - **Enforced 48dp+ touch target** (Capítulo 15) rather than relying on
+///   padding happening to add up.
+///
+/// The press mechanism itself is untouched: compress fast into the touch,
+/// release with a small overshoot (`BRAND PHYSICS`).
+enum PrimaryButtonVariant {
+  /// Flat fill. The default for ~every button in the app.
+  solid,
+
+  /// Transparent with a hairline border — a secondary action that still
+  /// answers the touch with Bufón's own press physics, unlike a bare
+  /// `OutlinedButton`.
+  outline,
+
+  /// The only gradient the design system allows outside a full-screen
+  /// ceremonial background. Reserved for the winner moment.
+  ceremonial,
+}
 
 class AnimatedPrimaryButton extends StatefulWidget {
   final String text;
@@ -15,21 +55,22 @@ class AnimatedPrimaryButton extends StatefulWidget {
   final IconData? icon;
   final Color? backgroundColor;
   final Color? textColor;
+  final PrimaryButtonVariant variant;
 
-  /// Disabled-state background color. Defaults to the legacy
-  /// `AppColors.surfaceDark` so the three pre-existing consumers
-  /// (voting/game/final_winner screens) keep their exact current look.
-  /// Pass an explicit value on a migrated (light-mode) screen, where the
-  /// legacy dark surface would look like a stray dark box.
+  /// Disabled-state background color. Defaults to a neutral drawn from the
+  /// active register, so a disabled button no longer paints the legacy dark
+  /// surface onto a light screen.
   final Color? disabledBackgroundColor;
 
-  /// Disabled-state label color. Defaults to the legacy
-  /// `AppColors.textSecondary` for the same reason as
-  /// [disabledBackgroundColor].
+  /// Disabled-state label color.
   final Color? disabledForegroundColor;
 
   final double? width;
   final EdgeInsets? padding;
+
+  /// Overrides the accessibility label when the visible [text] is not a
+  /// useful description on its own.
+  final String? semanticLabel;
 
   const AnimatedPrimaryButton({
     super.key,
@@ -39,10 +80,12 @@ class AnimatedPrimaryButton extends StatefulWidget {
     this.icon,
     this.backgroundColor,
     this.textColor,
+    this.variant = PrimaryButtonVariant.solid,
     this.disabledBackgroundColor,
     this.disabledForegroundColor,
     this.width,
     this.padding,
+    this.semanticLabel,
   });
 
   @override
@@ -84,113 +127,145 @@ class _AnimatedPrimaryButtonState extends State<AnimatedPrimaryButton>
     super.dispose();
   }
 
+  bool get _isInteractive => widget.onPressed != null && !widget.isLoading;
+
   void _handleTapDown(TapDownDetails details) {
-    if (widget.onPressed != null && !widget.isLoading) {
-      setState(() => _isPressed = true);
-      _controller.forward();
-      HapticFeedback.lightImpact();
-      SoundService.tap();
-    }
+    if (!_isInteractive) return;
+    setState(() => _isPressed = true);
+    _controller.forward();
+    HapticService.lightImpact();
+    SoundService.tap();
   }
 
   void _handleTapUp(TapUpDetails details) {
-    if (widget.onPressed != null && !widget.isLoading) {
-      setState(() => _isPressed = false);
-      _controller.reverse();
-    }
+    if (!_isInteractive) return;
+    setState(() => _isPressed = false);
+    _controller.reverse();
   }
 
   void _handleTapCancel() {
-    if (widget.onPressed != null && !widget.isLoading) {
-      setState(() => _isPressed = false);
-      _controller.reverse();
-    }
+    if (!_isInteractive) return;
+    setState(() => _isPressed = false);
+    _controller.reverse();
   }
 
   @override
   Widget build(BuildContext context) {
+    final phase = context.phase;
     final isDisabled = widget.onPressed == null || widget.isLoading;
+    final isOutline = widget.variant == PrimaryButtonVariant.outline;
 
-    return GestureDetector(
-      onTapDown: _handleTapDown,
-      onTapUp: _handleTapUp,
-      onTapCancel: _handleTapCancel,
-      onTap: widget.onPressed,
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _scaleAnimation.value,
-            child: AnimatedContainer(
-              duration: MotionDurations.settleButton,
-              width: widget.width,
-              padding:
-                  widget.padding ??
-                  const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.md,
-                  ),
-              decoration: BoxDecoration(
-                gradient: isDisabled
-                    ? null
-                    : LinearGradient(
-                        colors: [
-                          widget.backgroundColor ?? AppColors.primary,
-                          (widget.backgroundColor ?? AppColors.primary)
-                              .withValues(alpha: 0.8),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                color: isDisabled
-                    ? (widget.disabledBackgroundColor ?? AppColors.surfaceDark)
-                    : null,
-                borderRadius: AppShapes.borderRadiusMd,
-                boxShadow: isDisabled || _isPressed
-                    ? AppElevation.ambient
-                    : AppElevation.protagonistShadow(
-                        widget.backgroundColor ?? AppColors.primary,
-                      ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (widget.isLoading)
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          widget.textColor ?? Colors.white,
-                        ),
-                      ),
+    final fill = widget.backgroundColor ?? phase.accent;
+    final foreground = widget.textColor ?? (isOutline ? fill : phase.onAccent);
+
+    final disabledFill =
+        widget.disabledBackgroundColor ??
+        (phase.isDark ? AppColors.graphitePlus1 : AppColors.paperLine);
+    final disabledForeground =
+        widget.disabledForegroundColor ??
+        (phase.isDark ? AppColors.inkSoft : AppColors.inkMuted);
+
+    final resolvedForeground = isDisabled ? disabledForeground : foreground;
+
+    return Semantics(
+      button: true,
+      enabled: !isDisabled,
+      label: widget.semanticLabel ?? widget.text,
+      // The visible Text is already announced through `label`; letting it
+      // through as well makes a screen reader read the button twice.
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTapDown: _handleTapDown,
+        onTapUp: _handleTapUp,
+        onTapCancel: _handleTapCancel,
+        onTap: widget.onPressed,
+        child: AnimatedBuilder(
+          animation: _scaleAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              // Capítulo 28: the press still confirms via colour and haptic
+              // when the platform asks for reduced motion; only the scale
+              // goes away.
+              scale: context.motion(full: _scaleAnimation.value, reduced: 1.0),
+              child: child,
+            );
+          },
+          child: AnimatedContainer(
+            duration: MotionDurations.settleButton,
+            width: widget.width,
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.buttonHeight,
+            ),
+            alignment: Alignment.center,
+            padding:
+                widget.padding ??
+                const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.md,
+                ),
+            decoration: BoxDecoration(
+              // Capítulo 8: the ceremonial gradient is the only gradient a
+              // button may draw, and only for the moment that earned it.
+              gradient:
+                  widget.variant == PrimaryButtonVariant.ceremonial &&
+                      !isDisabled
+                  ? AppElevation.ceremonialGradient(
+                      fill,
+                      Color.lerp(fill, AppColors.graphite, 0.35)!,
                     )
-                  else ...[
-                    if (widget.icon != null) ...[
-                      Icon(
-                        widget.icon,
-                        color: widget.textColor ?? Colors.white,
-                        size: 20,
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                    ],
-                    Text(
-                      widget.text,
-                      style: AppTypography.button.copyWith(
-                        color: isDisabled
-                            ? (widget.disabledForegroundColor ??
-                                  AppColors.textSecondary)
-                            : (widget.textColor ?? Colors.white),
+                  : null,
+              color: switch (widget.variant) {
+                _ when isDisabled => isOutline ? null : disabledFill,
+                PrimaryButtonVariant.outline => null,
+                PrimaryButtonVariant.solid => fill,
+                PrimaryButtonVariant.ceremonial => null,
+              },
+              border: isOutline
+                  ? AppShapes.focusBorder(resolvedForeground)
+                  : null,
+              borderRadius: AppShapes.borderRadiusFull,
+              // Capítulo 8: at most one Protagonist per screen, and never a
+              // grey shadow. An outline/disabled/pressed button is Ambiente.
+              boxShadow: isDisabled || _isPressed || isOutline
+                  ? AppElevation.ambient
+                  : AppElevation.protagonistShadow(fill),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.isLoading)
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      // Capítulo 24: a spinner inside a button takes the
+                      // button's own foreground, never a generic white.
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        resolvedForeground,
                       ),
                     ),
+                  )
+                else ...[
+                  if (widget.icon != null) ...[
+                    Icon(widget.icon, color: resolvedForeground, size: 20),
+                    const SizedBox(width: AppSpacing.sm),
                   ],
+                  Flexible(
+                    child: Text(
+                      widget.text,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.button.copyWith(
+                        color: resolvedForeground,
+                      ),
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

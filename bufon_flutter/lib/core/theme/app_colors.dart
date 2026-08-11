@@ -31,6 +31,17 @@ class AppColors {
   static const Color inkSoft = Color(0xFF8A8578);
   static const Color inkShade = Color(0xFF000000);
 
+  /// Accessible secondary text on Paper/Butter surfaces.
+  ///
+  /// [inkSoft] is the documented `ink` tint (Capítulo 5) and is correct as a
+  /// *muted* colour — hairlines, disabled fills, icon washes. It is not a
+  /// text colour: against `paper` (#FAFAF7) it measures ≈3.0:1, which passes
+  /// WCAG AA only for large text, and Fase 3D shipped it as `body1` (16pt)
+  /// on Home and Lobby. This adds the missing step instead of changing
+  /// `inkSoft`'s documented value: ≈7.1:1 on Paper, so secondary copy passes
+  /// AA at every size (Capítulo 28).
+  static const Color inkMuted = Color(0xFF5C574C);
+
   static const Color paper = Color(0xFFFAFAF7);
   static const Color paperTint = Color(0xFFFFFFFF);
   static const Color paperLine = Color(0xFFE4DFCF);

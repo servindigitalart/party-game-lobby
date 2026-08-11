@@ -56,10 +56,16 @@ class KeyholeRevealTransition extends AnimatedWidget {
   Widget build(BuildContext context) {
     final value = progress.value.clamp(0.0, 1.0);
 
+    // Sizes to [child] rather than forcing expansion. The original
+    // `StackFit.expand` meant this could only be used where an unbounded
+    // parent gave it a definite size, which is why Fase 2A had to relax it to
+    // wire the transition into the reveal card — the reveal's content is a
+    // variable-height answer inside a Column. The backdrop still covers the
+    // full painted area via Positioned.fill.
     return Stack(
-      fit: StackFit.expand,
       children: [
-        if (backdropColor != null) ColoredBox(color: backdropColor!),
+        if (backdropColor != null)
+          Positioned.fill(child: ColoredBox(color: backdropColor!)),
         ClipPath(
           clipper: _KeyholeClipper(progress: value, origin: origin),
           child: child,

@@ -1,8 +1,19 @@
 // core/theme/app_typography.dart
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
+
+/// The one place a font family name is written.
+///
+/// Fase 2A moved typography off `google_fonts`, which fetches font binaries
+/// over HTTP on first use. That meant a cold first launch without network —
+/// a bar, a house with saturated Wi-Fi, a phone in airplane mode, all normal
+/// conditions for a party game — rendered the entire brand in the platform
+/// default (Roboto/SF Pro), and a share card generated before the fetch
+/// completed left the app with the brand's own name set in someone else's
+/// typeface, permanently. The faces are now bundled assets (see
+/// `pubspec.yaml`), so nothing about Bufón's identity depends on the network.
+const String _kBrandFontFamily = 'PlusJakartaSans';
 
 /// BUFÓN Typography System — implements BUFON_DESIGN_SYSTEM.md v1.1,
 /// Capítulo 6.
@@ -11,8 +22,7 @@ import 'app_colors.dart';
 /// below ([_display], [_body]) instead of being inlined in every
 /// [TextStyle]. The design doc explicitly left the Display face undecided —
 /// v1.0's pick (Fredoka/Baloo/Poppins) was flagged in the v1.1 review as
-/// "the generic rounded-app default", and the real candidate (something
-/// closer to a stencil/rubber-stamp face, per Capítulo 6) needs on-device
+/// "the generic rounded-app default", and the real candidate needs on-device
 /// comparison against the logotype before it's fixed. Until that decision
 /// is made, both functions point at the same body-safe face (Plus Jakarta
 /// Sans, which the doc *did* already settle on for body/UI text). Swapping
@@ -27,7 +37,12 @@ TextStyle _display({
 }) {
   // TODO(design-system): replace with the chosen Display face once
   // on-device comparison against the logotype (Capítulo 6, v1.1) is done.
-  return GoogleFonts.plusJakartaSans(
+  // Fase 2A deliberately did not pick one: the design doc rejects the v1.0
+  // shortlist and the blueprint makes "keep this face" a valid outcome of
+  // the comparison. Bundling first means the network defect is fixed
+  // whichever face wins.
+  return TextStyle(
+    fontFamily: _kBrandFontFamily,
     fontSize: fontSize,
     fontWeight: fontWeight,
     height: height,
@@ -43,7 +58,8 @@ TextStyle _body({
   Color? color,
   double? letterSpacing,
 }) {
-  return GoogleFonts.plusJakartaSans(
+  return TextStyle(
+    fontFamily: _kBrandFontFamily,
     fontSize: fontSize,
     fontWeight: fontWeight,
     height: height,

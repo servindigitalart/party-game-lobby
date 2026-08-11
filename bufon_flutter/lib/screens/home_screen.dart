@@ -1,16 +1,20 @@
 // screens/home_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_providers.dart';
 import '../core/telemetry/game_telemetry_service.dart';
 import '../core/exceptions.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
-import '../core/theme/app_theme.dart';
+import '../core/theme/bufon_phase.dart';
 import '../core/theme/app_typography.dart';
+import '../presentation/navigation/page_transitions.dart';
+import '../presentation/screens/leaderboard_screen.dart';
+import '../presentation/screens/profile_screen.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../presentation/widgets/brand_mark.dart';
 import '../presentation/widgets/season_countdown_banner.dart';
+import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
 import 'lobby_screen.dart';
 
@@ -67,9 +71,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       connectionService.startHeartbeat(roomCode: room.code, playerId: userId);
 
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LobbyScreen()),
-        );
+        // Capítulo 23: forward movement through the loop uses Arrive
+        // (fade + slide), not Material's default route transition.
+        context.replaceFadeSlide(const LobbyScreen());
       }
     } catch (e) {
       _showError(_friendlyRoomError(e, fallback: 'Error al crear sala'));
@@ -112,9 +116,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       connectionService.startHeartbeat(roomCode: room.code, playerId: userId);
 
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LobbyScreen()),
-        );
+        // Capítulo 23: forward movement through the loop uses Arrive
+        // (fade + slide), not Material's default route transition.
+        context.replaceFadeSlide(const LobbyScreen());
       }
     } catch (e) {
       _showError(_friendlyRoomError(e, fallback: 'Error al unirse'));
@@ -144,18 +148,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
       return error.message;
     }
-    return '$fallback: $error';
+    // Capítulo 26: never surface a raw exception to a player. The technical
+    // detail already reaches AppLogger/Crashlytics through the repository
+    // layer; interpolating `$error` here only put a Dart exception string in
+    // front of someone trying to start a game.
+    return '$fallback. Inténtalo de nuevo en un momento.';
+  }
+
+  void _openProfile() {
+    HapticService.lightImpact();
+    SoundService.tap();
+    context.pushFadeSlide(const ProfileScreen());
+  }
+
+  void _openLeaderboard() {
+    HapticService.lightImpact();
+    SoundService.tap();
+    context.pushFadeSlide(const LeaderboardScreen());
   }
 
   @override
   Widget build(BuildContext context) {
-    // Fase 3D: Home migrates to the Butter Bliss light register (Capítulo
-    // 30 — "la vida social alrededor del juego"). Scoped to this screen's
-    // subtree with a local Theme override rather than touching main.dart,
-    // so no other screen is affected.
-    return Theme(
-      data: AppTheme.lightTheme,
+    // Fase 3D put Home on the Butter Bliss light register (Capítulo 30 — "la
+    // vida social alrededor del juego") via a bare local Theme override.
+    // Fase 2A replaces that with PhaseScope, which additionally carries the
+    // register's accent and its system-bar styling.
+    return PhaseScope(
+      phase: BufonPhase.home,
       child: Scaffold(
+        appBar: AppBar(
+          // The isotype is the identity anchor of the shell (Capítulo 2: "la
+          // marca vive en la geometría"), and the two actions are what makes
+          // the progression surface reachable at all — before Fase 2A neither
+          // ProfileScreen nor LeaderboardScreen had a single inbound
+          // navigation, so every reward the backend granted was invisible.
+          title: const BrandMark(size: 36),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.emoji_events),
+              tooltip: 'Rankings',
+              onPressed: _isLoading ? null : _openLeaderboard,
+            ),
+            IconButton(
+              icon: const Icon(Icons.person),
+              tooltip: 'Mi perfil',
+              onPressed: _isLoading ? null : _openProfile,
+            ),
+          ],
+        ),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
@@ -170,9 +211,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Season Countdown Banner at top
-                        const SeasonCountdownBanner(),
-                        const SizedBox(height: AppSpacing.lg),
                         Text(
                           'BUFÓN',
                           style: AppTypography.display.copyWith(
@@ -184,7 +222,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Text(
                           '¿Quién es el más chistoso?',
                           style: AppTypography.body1.copyWith(
-                            color: AppColors.inkSoft,
+                            // inkMuted, not inkSoft: the tint fails AA at
+                            // body size on Paper. See AppColors.inkMuted.
+                            color: AppColors.inkMuted,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -201,10 +241,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           text: 'Crear Sala',
                           onPressed: _isLoading ? null : _createRoom,
                           isLoading: _isLoading,
-                          backgroundColor: AppColors.butter,
-                          textColor: AppColors.ink,
-                          disabledBackgroundColor: AppColors.paperLine,
-                          disabledForegroundColor: AppColors.inkSoft,
                         ),
                         const SizedBox(height: AppSpacing.xl),
                         const Divider(),
@@ -218,21 +254,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           enabled: !_isLoading,
                         ),
                         const SizedBox(height: AppSpacing.md),
-                        OutlinedButton(
-                          onPressed: _isLoading
-                              ? null
-                              : () {
-                                  // AnimatedPrimaryButton triggers this same
-                                  // haptic+sound pair internally on tap-down; this
-                                  // button has no built-in feedback, so it's added
-                                  // explicitly here to match (Capítulo 18/19 — every
-                                  // main button gets haptic + sound).
-                                  HapticFeedback.lightImpact();
-                                  SoundService.tap();
-                                  _joinRoom();
-                                },
-                          child: const Text('Unirse a Sala'),
+                        AnimatedPrimaryButton(
+                          text: 'Unirse a Sala',
+                          variant: PrimaryButtonVariant.outline,
+                          backgroundColor: AppColors.ink,
+                          onPressed: _isLoading ? null : _joinRoom,
                         ),
+                        const SizedBox(height: AppSpacing.lg),
+                        // A season is context, not the reason the app was
+                        // opened: it sits below the primary actions so it
+                        // stops out-competing the brand for attention on the
+                        // first screen (Capítulo 3 ley 4).
+                        const SeasonCountdownBanner(),
                       ],
                     ),
                   ),

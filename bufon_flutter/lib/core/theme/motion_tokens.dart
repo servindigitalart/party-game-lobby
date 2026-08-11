@@ -72,6 +72,15 @@ class MotionCurves {
   /// (Pulse) — symmetric, since nothing is being "loaded" or "released".
   static const Curve pulse = Curves.easeInOut;
 
+  /// A narrative unveiling (Reveal) — decelerating, no overshoot. An
+  /// opening is not a spring: [release]'s bounce-back belongs to touch
+  /// feedback, and a mask that overshoots past fully-open then settles back
+  /// would re-hide content it had already revealed. Added in Fase 2A when
+  /// `KeyholeRevealTransition` was finally wired in and needed the curve the
+  /// blueprint names for it ("`revealStage` 800 ms, `easeOut`, origin
+  /// centre") — the six existing curves had no decelerate-only member.
+  static const Curve reveal = Curves.easeOut;
+
   /// A value/text swap, or a container settling after a state change.
   static const Curve settle = Curves.easeInOut;
 }

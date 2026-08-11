@@ -8,8 +8,12 @@ import '../core/telemetry/game_telemetry_service.dart';
 import '../core/exceptions.dart';
 import '../core/game_copy.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_elevation.dart';
+import '../core/theme/app_shapes.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/theme/bufon_phase.dart';
+import '../core/theme/motion_tokens.dart';
 import '../presentation/widgets/timer_widget.dart';
 import '../presentation/widgets/animated_primary_button.dart';
 import '../presentation/widgets/game_progress_widgets.dart';
@@ -62,7 +66,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
-            backgroundColor: AppColors.warning,
+            backgroundColor: AppColors.coralShade,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
@@ -104,7 +108,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Escribe una respuesta'),
-          backgroundColor: AppColors.warning,
+          backgroundColor: AppColors.coralShade,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
@@ -125,7 +129,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Respuesta enviada'),
-            backgroundColor: AppColors.success,
+            backgroundColor: AppColors.mintShade,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
@@ -140,7 +144,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_friendlyAnswerError(e)),
-            backgroundColor: AppColors.error,
+            backgroundColor: AppColors.coralShade,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
@@ -153,8 +157,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al enviar: $e'),
-            backgroundColor: AppColors.error,
+            content: const Text('Algo se atoró al enviar. Inténtalo de nuevo.'),
+            backgroundColor: AppColors.coralShade,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
@@ -183,7 +187,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_friendlyPhaseError(e)),
-            backgroundColor: AppColors.error,
+            backgroundColor: AppColors.coralShade,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -292,221 +296,213 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           roomCode: room.code,
         );
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: AppColors.surface,
-            elevation: 0,
-            title: RoundIndicator(
-              currentRound: room.currentRound,
-              totalRounds: room.totalRounds,
+        // Fase 3E: the answering phase is the Graphite register with Sky as
+        // its single accent (Capítulo 33 — "Solo yo y mi ingenio contra el
+        // reloj"). Surfaces now come from the theme instead of the legacy
+        // casino palette.
+        return PhaseScope(
+          phase: BufonPhase.answering,
+          child: Scaffold(
+            appBar: AppBar(
+              title: RoundIndicator(
+                currentRound: room.currentRound,
+                totalRounds: room.totalRounds,
+              ),
+              centerTitle: true,
             ),
-            centerTitle: true,
-          ),
-          body: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                GameProgressBar(
-                  currentRound: room.currentRound,
-                  totalRounds: room.totalRounds,
-                ),
-                const SizedBox(height: AppSpacing.lg),
+            body: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Scrollable region. Everything above the status panel can
+                  // grow (long question, 200% text scale, raised keyboard)
+                  // without pushing the pinned footer off screen.
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          GameProgressBar(
+                            currentRound: room.currentRound,
+                            totalRounds: room.totalRounds,
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
 
-                TimerWidget(
-                  remainingSeconds: _remainingSeconds,
-                  totalSeconds: room.roundDuration,
-                ),
-                const SizedBox(height: AppSpacing.xl),
+                          TimerWidget(
+                            remainingSeconds: _remainingSeconds,
+                            totalSeconds: room.roundDuration,
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
 
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    room.currentQuestionText ?? '',
-                    style: AppTypography.h2.copyWith(
-                      color: Colors.white,
-                      height: 1.3,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
+                          // The question is the one Protagonist of this screen
+                          // (Capítulo 3 ley 4 / Capítulo 8): flat Graphite+1 with a Sky
+                          // hairline and a Sky-tinted shadow, never the old red
+                          // gradient (Capítulo 3 ley 1 forbids gradient as a default).
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(AppSpacing.lg),
+                            decoration: BoxDecoration(
+                              color: AppColors.graphitePlus1,
+                              borderRadius: AppShapes.borderRadiusXl,
+                              border: AppShapes.hairlineBorder(
+                                AppColors.sky.withValues(alpha: 0.45),
+                              ),
+                              boxShadow: AppElevation.protagonistShadow(
+                                AppColors.sky,
+                              ),
+                            ),
+                            child: Text(
+                              room.currentQuestionText ?? '',
+                              style: AppTypography.h2.copyWith(
+                                color: AppColors.paper,
+                                height: 1.3,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
 
-                if (_isAdvancing || allAnswered || _remainingSeconds <= 0) ...[
-                  _TransitionBanner(
-                    title: GameCopy.revealingAnswers,
-                    subtitle: allAnswered
-                        ? 'Nadie se puede arrepentir ya.'
-                        : 'Se acabó el tiempo. Lo que quedó, quedó.',
-                    icon: Icons.visibility,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                ],
+                          if (_isAdvancing ||
+                              allAnswered ||
+                              _remainingSeconds <= 0) ...[
+                            _TransitionBanner(
+                              title: GameCopy.revealingAnswers,
+                              subtitle: allAnswered
+                                  ? 'Nadie se puede arrepentir ya.'
+                                  : 'Se acabó el tiempo. Lo que quedó, quedó.',
+                              icon: Icons.visibility,
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                          ],
 
-                if (!hasAnswered) ...[
-                  Text(
-                    'Tu respuesta:',
-                    style: AppTypography.h4.copyWith(
-                      color: AppColors.textPrimary,
+                          if (!hasAnswered) ...[
+                            Text(
+                              'Tu respuesta:',
+                              style: AppTypography.h4.copyWith(
+                                color: AppColors.paper,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            TextField(
+                              controller: _answerController,
+                              maxLength: 100,
+                              maxLines: 3,
+                              style: AppTypography.body1.copyWith(
+                                color: AppColors.paper,
+                              ),
+                              // Fill, borders and radii now come from
+                              // inputDecorationTheme (Capítulo 14: tokens, never
+                              // literals) instead of being hand-rolled per field.
+                              decoration: const InputDecoration(
+                                hintText: 'Escribe algo gracioso...',
+                              ),
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) =>
+                                  _submitAnswer(room.code, currentPlayer.id),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            AnimatedPrimaryButton(
+                              text: 'Enviar Respuesta',
+                              onPressed: () =>
+                                  _submitAnswer(room.code, currentPlayer.id),
+                              icon: Icons.send,
+                            ),
+                          ] else ...[
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              decoration: BoxDecoration(
+                                color: AppColors.mint.withValues(alpha: 0.12),
+                                borderRadius: AppShapes.borderRadiusLg,
+                                border: AppShapes.focusBorder(
+                                  AppColors.mint.withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: AppColors.mint,
+                                    size: 48,
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  Text(
+                                    '¡Respuesta enviada!',
+                                    style: AppTypography.h3.copyWith(
+                                      color: AppColors.mint,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Text(
+                                    'Tu respuesta:',
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.paper.withValues(
+                                        alpha: 0.72,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    currentPlayer.currentAnswer ?? '',
+                                    style: AppTypography.body1.copyWith(
+                                      color: AppColors.paper,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  TextField(
-                    controller: _answerController,
-                    maxLength: 100,
-                    maxLines: 3,
-                    style: AppTypography.body1.copyWith(
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Escribe algo gracioso...',
-                      hintStyle: AppTypography.body1.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.buttonRadius,
-                        ),
-                        borderSide: BorderSide(color: AppColors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.buttonRadius,
-                        ),
-                        borderSide: BorderSide(color: AppColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.buttonRadius,
-                        ),
-                        borderSide: BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                      counterStyle: AppTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) =>
-                        _submitAnswer(room.code, currentPlayer.id),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  AnimatedPrimaryButton(
-                    text: 'Enviar Respuesta',
-                    onPressed: () => _submitAnswer(room.code, currentPlayer.id),
-                    icon: Icons.send,
-                  ),
-                ] else ...[
+
                   Container(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
-                      color: AppColors.success.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(
-                        AppSpacing.cardRadius,
-                      ),
-                      border: Border.all(
-                        color: AppColors.success.withValues(alpha: 0.3),
-                        width: 2,
-                      ),
+                      color: AppColors.graphitePlus1,
+                      borderRadius: AppShapes.borderRadiusMd,
+                      border: AppShapes.hairlineBorder(AppColors.graphitePlus1),
                     ),
                     child: Column(
                       children: [
-                        Icon(
-                          Icons.check_circle,
-                          color: AppColors.success,
-                          size: 48,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          '¡Respuesta enviada!',
-                          style: AppTypography.h3.copyWith(
-                            color: AppColors.success,
+                        LinearProgressIndicator(
+                          value: room.players.isEmpty
+                              ? 0
+                              : answeredCount / room.players.length,
+                          backgroundColor: AppColors.graphiteShade,
+                          valueColor: const AlwaysStoppedAnimation(
+                            AppColors.sky,
                           ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Tu respuesta:',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                          minHeight: 6,
+                          borderRadius: BorderRadius.circular(3),
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          currentPlayer.currentAnswer ?? '',
-                          style: AppTypography.body1.copyWith(
-                            color: AppColors.textPrimary,
-                            fontStyle: FontStyle.italic,
+                          '${GameCopy.answerProgress(answeredCount, room.players.length)}\n'
+                          '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.paper.withValues(alpha: 0.72),
                           ),
                           textAlign: TextAlign.center,
                         ),
                       ],
                     ),
                   ),
-                ],
+                  const SizedBox(height: AppSpacing.md),
 
-                const Spacer(),
-
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(
-                      AppSpacing.buttonRadius,
+                  if (isHost && allAnswered)
+                    AnimatedPrimaryButton(
+                      text: _isAdvancing ? 'Revelando...' : 'Iniciar Votación',
+                      onPressed: () => _moveToVoting(room.code),
+                      icon: Icons.how_to_vote,
+                      isLoading: _isAdvancing,
                     ),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      LinearProgressIndicator(
-                        value:
-                            room.players
-                                .where((p) => p.currentAnswer != null)
-                                .length /
-                            room.players.length,
-                        backgroundColor: AppColors.surfaceDark,
-                        valueColor: AlwaysStoppedAnimation(AppColors.accent),
-                        minHeight: 6,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        '${GameCopy.answerProgress(answeredCount, room.players.length)}\n'
-                        '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                if (isHost && allAnswered)
-                  AnimatedPrimaryButton(
-                    text: _isAdvancing ? 'Revelando...' : 'Iniciar Votación',
-                    onPressed: () => _moveToVoting(room.code),
-                    icon: Icons.how_to_vote,
-                    backgroundColor: AppColors.accent,
-                    isLoading: _isAdvancing,
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -550,26 +546,31 @@ class _TransitionBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Arrive (Capítulo 16): enters already compressed and expands to rest.
     return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 350),
+      duration: MotionDurations.arrive,
       tween: Tween(begin: 0.0, end: 1.0),
-      curve: Curves.easeOut,
+      curve: MotionCurves.release,
       builder: (context, value, child) {
+        final scale =
+            MotionScale.arriveFrom + ((1 - MotionScale.arriveFrom) * value);
         return Opacity(
-          opacity: value,
-          child: Transform.scale(scale: 0.96 + (value * 0.04), child: child),
+          opacity: value.clamp(0.0, 1.0),
+          child: Transform.scale(scale: scale, child: child),
         );
       },
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.gold.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-          border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+          color: AppColors.butter.withValues(alpha: 0.12),
+          borderRadius: AppShapes.borderRadiusLg,
+          border: AppShapes.hairlineBorder(
+            AppColors.butter.withValues(alpha: 0.35),
+          ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.gold),
+            Icon(icon, color: AppColors.butter),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
@@ -577,12 +578,12 @@ class _TransitionBanner extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: AppTypography.h4.copyWith(color: AppColors.gold),
+                    style: AppTypography.h4.copyWith(color: AppColors.butter),
                   ),
                   Text(
                     subtitle,
                     style: AppTypography.body2.copyWith(
-                      color: AppColors.textSecondary,
+                      color: AppColors.paper.withValues(alpha: 0.72),
                     ),
                   ),
                 ],

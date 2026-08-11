@@ -10,8 +10,11 @@ import '../core/telemetry/game_telemetry_service.dart';
 import '../core/exceptions.dart';
 import '../core/game_copy.dart';
 import '../core/theme/app_colors.dart';
+import '../core/theme/app_shapes.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/theme/bufon_phase.dart';
+import '../core/theme/motion_tokens.dart';
 import '../presentation/widgets/game_card.dart';
 import '../presentation/widgets/animated_primary_button.dart';
 import '../presentation/widgets/game_progress_widgets.dart';
@@ -61,7 +64,7 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('¡Voto registrado!'),
-            backgroundColor: AppColors.success,
+            backgroundColor: AppColors.mintShade,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
@@ -98,7 +101,7 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
-            backgroundColor: AppColors.error,
+            backgroundColor: AppColors.coralShade,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
@@ -111,8 +114,10 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error inesperado: $e'),
-            backgroundColor: AppColors.error,
+            content: const Text(
+              'Algo se atoró al registrar tu voto. Inténtalo de nuevo.',
+            ),
+            backgroundColor: AppColors.coralShade,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
@@ -141,7 +146,7 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_friendlyResultError(e)),
-            backgroundColor: AppColors.error,
+            backgroundColor: AppColors.coralShade,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -229,187 +234,188 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
           roomCode: room.code,
         );
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            backgroundColor: AppColors.surface,
-            elevation: 0,
-            title: RoundIndicator(
-              currentRound: room.currentRound,
-              totalRounds: room.totalRounds,
+        // Fase 3E: voting is the Graphite register with Lavender as its
+        // single accent (Capítulo 33 — "Estoy juzgando en secreto"). A
+        // screenshot of this screen is now distinguishable from the answering
+        // screen without reading a word, which is the acceptance criterion.
+        return PhaseScope(
+          phase: BufonPhase.voting,
+          child: Scaffold(
+            appBar: AppBar(
+              title: RoundIndicator(
+                currentRound: room.currentRound,
+                totalRounds: room.totalRounds,
+              ),
+              centerTitle: true,
             ),
-            centerTitle: true,
-          ),
-          body: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                GameProgressBar(
-                  currentRound: room.currentRound,
-                  totalRounds: room.totalRounds,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-
-                Text(
-                  '¿Cuál es la respuesta más chistosa?',
-                  style: AppTypography.h2.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(
-                      AppSpacing.buttonRadius,
-                    ),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    room.currentQuestionText ?? '',
-                    style: AppTypography.body1.copyWith(
-                      color: AppColors.primary,
-                      fontStyle: FontStyle.italic,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-
-                if (_isAdvancing || allVoted) ...[
-                  _VoteTransitionBanner(
-                    title: GameCopy.countingVotes,
-                    subtitle: 'El juicio social ya está cerrado.',
+            body: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  GameProgressBar(
+                    currentRound: room.currentRound,
+                    totalRounds: room.totalRounds,
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                ],
 
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: shuffledPlayers.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, index) {
-                      final player = shuffledPlayers[index];
-                      final isSelected = currentPlayer.votedFor == player.id;
-                      final canVote = !hasVoted && player.id != userId;
-
-                      return TweenAnimationBuilder<double>(
-                        duration: Duration(milliseconds: 200 + (index * 50)),
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        curve: Curves.easeOut,
-                        builder: (context, value, child) {
-                          return Opacity(
-                            opacity: value,
-                            child: Transform.translate(
-                              offset: Offset(20 * (1 - value), 0),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: GameCard(
-                          text: player.currentAnswer ?? 'Sin respuesta',
-                          isSelected: isSelected,
-                          isDisabled: !canVote,
-                          selectedColor: AppColors.success,
-                          onTap: canVote
-                              ? () => _vote(
-                                  context,
-                                  ref,
-                                  room.code,
-                                  currentPlayer.id,
-                                  player.id,
-                                )
-                              : null,
-                        ),
-                      );
-                    },
+                  Text(
+                    '¿Cuál es la respuesta más chistosa?',
+                    style: AppTypography.h2.copyWith(color: AppColors.paper),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: hasVoted
-                        ? AppColors.success.withValues(alpha: 0.1)
-                        : AppColors.surface,
-                    borderRadius: BorderRadius.circular(
-                      AppSpacing.buttonRadius,
+                  const SizedBox(height: AppSpacing.xs),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.lavender.withValues(alpha: 0.12),
+                      borderRadius: AppShapes.borderRadiusMd,
+                      border: AppShapes.hairlineBorder(
+                        AppColors.lavender.withValues(alpha: 0.35),
+                      ),
                     ),
-                    border: Border.all(
+                    child: Text(
+                      room.currentQuestionText ?? '',
+                      style: AppTypography.body1.copyWith(
+                        color: AppColors.lavender,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  if (_isAdvancing || allVoted) ...[
+                    _VoteTransitionBanner(
+                      title: GameCopy.countingVotes,
+                      subtitle: 'El juicio social ya está cerrado.',
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: shuffledPlayers.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        final player = shuffledPlayers[index];
+                        final isSelected = currentPlayer.votedFor == player.id;
+                        final canVote = !hasVoted && player.id != userId;
+
+                        return TweenAnimationBuilder<double>(
+                          duration: Duration(milliseconds: 200 + (index * 50)),
+                          tween: Tween(begin: 0.0, end: 1.0),
+                          curve: Curves.easeOut,
+                          builder: (context, value, child) {
+                            return Opacity(
+                              opacity: value,
+                              child: Transform.translate(
+                                offset: Offset(20 * (1 - value), 0),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: GameCard(
+                            text: player.currentAnswer ?? 'Sin respuesta',
+                            isSelected: isSelected,
+                            isDisabled: !canVote,
+                            semanticLabel: player.id == userId
+                                ? 'Tu respuesta: ${player.currentAnswer ?? "sin respuesta"}. '
+                                      'No puedes votar por ti mismo.'
+                                : null,
+                            onTap: canVote
+                                ? () => _vote(
+                                    context,
+                                    ref,
+                                    room.code,
+                                    currentPlayer.id,
+                                    player.id,
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
                       color: hasVoted
-                          ? AppColors.success.withValues(alpha: 0.3)
-                          : AppColors.border,
+                          ? AppColors.mint.withValues(alpha: 0.12)
+                          : AppColors.graphitePlus1,
+                      borderRadius: AppShapes.borderRadiusMd,
+                      border: AppShapes.hairlineBorder(
+                        hasVoted
+                            ? AppColors.mint.withValues(alpha: 0.35)
+                            : AppColors.graphitePlus1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              hasVoted ? Icons.check_circle : Icons.touch_app,
+                              color: hasVoted
+                                  ? AppColors.mint
+                                  : AppColors.paper.withValues(alpha: 0.72),
+                              size: 20,
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              hasVoted
+                                  ? '¡Voto enviado!'
+                                  : 'Toca una respuesta para votar',
+                              style: AppTypography.body1.copyWith(
+                                color: hasVoted
+                                    ? AppColors.mint
+                                    : AppColors.paper.withValues(alpha: 0.72),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        LinearProgressIndicator(
+                          value:
+                              room.players
+                                  .where((p) => p.votedFor != null)
+                                  .length /
+                              room.players.length,
+                          backgroundColor: AppColors.graphiteShade,
+                          valueColor: AlwaysStoppedAnimation(
+                            hasVoted ? AppColors.mint : AppColors.lavender,
+                          ),
+                          minHeight: 6,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          '${GameCopy.voteProgress(votedCount, room.players.length)}\n'
+                          '${GameCopy.voteWaiting(votedCount, room.players.length)}',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.paper.withValues(alpha: 0.72),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            hasVoted ? Icons.check_circle : Icons.touch_app,
-                            color: hasVoted
-                                ? AppColors.success
-                                : AppColors.textSecondary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            hasVoted
-                                ? '¡Voto enviado!'
-                                : 'Toca una respuesta para votar',
-                            style: AppTypography.body1.copyWith(
-                              color: hasVoted
-                                  ? AppColors.success
-                                  : AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      LinearProgressIndicator(
-                        value:
-                            room.players
-                                .where((p) => p.votedFor != null)
-                                .length /
-                            room.players.length,
-                        backgroundColor: AppColors.surfaceDark,
-                        valueColor: AlwaysStoppedAnimation(
-                          hasVoted ? AppColors.success : AppColors.accent,
-                        ),
-                        minHeight: 6,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        '${GameCopy.voteProgress(votedCount, room.players.length)}\n'
-                        '${GameCopy.voteWaiting(votedCount, room.players.length)}',
-                        style: AppTypography.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: AppSpacing.md),
 
-                if (isHost && allVoted)
-                  AnimatedPrimaryButton(
-                    text: _isAdvancing ? 'Contando...' : 'Ver Resultados',
-                    onPressed: () => _moveToResults(context, ref, room.code),
-                    icon: Icons.emoji_events,
-                    backgroundColor: AppColors.success,
-                    isLoading: _isAdvancing,
-                  ),
-              ],
+                  if (isHost && allVoted)
+                    AnimatedPrimaryButton(
+                      text: _isAdvancing ? 'Contando...' : 'Ver Resultados',
+                      onPressed: () => _moveToResults(context, ref, room.code),
+                      icon: Icons.emoji_events,
+                      backgroundColor: AppColors.mintShade,
+                      isLoading: _isAdvancing,
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -430,19 +436,33 @@ class _VoteTransitionBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      opacity: 1,
-      duration: const Duration(milliseconds: 250),
+    // Arrive (Capítulo 16). This previously used
+    // `AnimatedOpacity(opacity: 1)` with nothing driving the value, so it
+    // never animated at all while its twin on the answering screen did.
+    return TweenAnimationBuilder<double>(
+      duration: MotionDurations.arrive,
+      tween: Tween(begin: 0.0, end: 1.0),
+      curve: MotionCurves.release,
+      builder: (context, value, child) {
+        final scale =
+            MotionScale.arriveFrom + ((1 - MotionScale.arriveFrom) * value);
+        return Opacity(
+          opacity: value.clamp(0.0, 1.0),
+          child: Transform.scale(scale: scale, child: child),
+        );
+      },
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.success.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
-          border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
+          color: AppColors.butter.withValues(alpha: 0.12),
+          borderRadius: AppShapes.borderRadiusLg,
+          border: AppShapes.hairlineBorder(
+            AppColors.butter.withValues(alpha: 0.35),
+          ),
         ),
         child: Row(
           children: [
-            const Icon(Icons.how_to_vote, color: AppColors.success),
+            const Icon(Icons.how_to_vote, color: AppColors.butter),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
@@ -450,12 +470,12 @@ class _VoteTransitionBanner extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: AppTypography.h4.copyWith(color: AppColors.success),
+                    style: AppTypography.h4.copyWith(color: AppColors.butter),
                   ),
                   Text(
                     subtitle,
                     style: AppTypography.body2.copyWith(
-                      color: AppColors.textSecondary,
+                      color: AppColors.paper.withValues(alpha: 0.72),
                     ),
                   ),
                 ],
