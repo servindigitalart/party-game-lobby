@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import '../core/theme/bufon_phase.dart';
 import '../models/avatar.dart';
 import '../presentation/widgets/confetti_widget.dart';
 import '../presentation/widgets/animated_primary_button.dart';
@@ -99,7 +100,15 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
       orElse: () => Avatars.all.first,
     );
 
-    return Scaffold(
+    // Fase 2B WP1: authored against `AppTheme.legacyTheme`, painting legacy
+    // dark surfaces from raw hex. Fase 2A made `lightTheme` the app theme and
+    // a pushed route does not inherit the pusher's `Theme`, so anything left
+    // to the ambient theme resolved to Ink on dark. `BufonPhase.legacy` is
+    // the documented opt-in that restores the theme this screen was written
+    // for — including the off-screen share card below, which renders through
+    // this same subtree. Migration boundary marker: this screen becomes
+    // `BufonPhase.nightWinner` when the ceremonial pass lands.
+    final content = Scaffold(
       backgroundColor: const Color(0xFF111111),
       body: Stack(
         children: [
@@ -134,6 +143,8 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
         ],
       ),
     );
+
+    return PhaseScope(phase: BufonPhase.legacy, child: content);
   }
 
   Widget _buildGradientBackground() {

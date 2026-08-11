@@ -4,6 +4,7 @@ import '../../core/logging/log_level.dart';
 import '../../core/logging/log_category.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/bufon_phase.dart';
 import '../../services/ad_service.dart';
 import '../../services/iap_service.dart';
 import '../../data/repositories/room_repository.dart';
@@ -174,7 +175,14 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // Fase 2B WP1: authored against `AppTheme.legacyTheme`, painting legacy
+    // dark surfaces from raw hex. Fase 2A made `lightTheme` the app theme and
+    // a pushed route does not inherit the pusher's `Theme`, so anything left
+    // to the ambient theme resolved to Ink on dark. `BufonPhase.legacy` is
+    // the documented opt-in that restores the theme this screen was written
+    // for. Migration boundary marker — this screen handles money and is the
+    // least migrated in the app; it is deliberately untouched otherwise.
+    final content = Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
       appBar: AppBar(
         backgroundColor: const Color(0xFF16213E),
@@ -279,6 +287,8 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               ),
       ),
     );
+
+    return PhaseScope(phase: BufonPhase.legacy, child: content);
   }
 
   Widget _buildOptionCard({

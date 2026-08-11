@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/bufon_phase.dart';
 import '../../models/season.dart';
 import '../../providers/leaderboard_providers.dart';
 import '../../providers/game_providers.dart';
@@ -45,7 +46,13 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
     );
     final userId = ref.watch(userIdProvider);
 
-    return Scaffold(
+    // Fase 2B WP1: authored against `AppTheme.legacyTheme`, still painting
+    // legacy dark surfaces. Fase 2A made `lightTheme` the app theme and a
+    // pushed route does not inherit the pusher's `Theme`, so the app-bar
+    // title, back arrow and unstyled `Text` resolved to Ink on dark.
+    // `BufonPhase.legacy` is the documented opt-in that restores the theme
+    // this screen was written for. Migration boundary marker.
+    final content = Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(widget.season.name),
@@ -60,6 +67,8 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
         ],
       ),
     );
+
+    return PhaseScope(phase: BufonPhase.legacy, child: content);
   }
 
   Widget _buildSeasonHeader() {

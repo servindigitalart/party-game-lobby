@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/bufon_phase.dart';
 import '../../models/achievement.dart';
 import '../../models/avatar.dart';
 import '../../providers/progression_providers.dart';
@@ -41,7 +42,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileStreamProvider);
 
-    return Scaffold(
+    // Fase 2B WP1: this screen was authored against `AppTheme.legacyTheme`
+    // and paints legacy dark surfaces directly, but Fase 2A made
+    // `lightTheme` the app theme — and a pushed route does not inherit the
+    // pushing screen's `Theme`, so everything left to the ambient theme
+    // (app-bar title, back arrow, action icons, unstyled `Text`) resolved to
+    // Ink on those dark surfaces. `BufonPhase.legacy` is the documented
+    // opt-in for exactly this state: it restores the theme the screen was
+    // written for, unchanged. It is a migration boundary marker, not an
+    // endorsement — replace it with `BufonPhase.profile` when this screen
+    // migrates to the Paper register.
+    final content = Scaffold(
       appBar: AppBar(
         title: const Text('Perfil'),
         centerTitle: true,
@@ -108,6 +119,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         error: (error, stack) => Center(child: Text('Error: $error')),
       ),
     );
+
+    return PhaseScope(phase: BufonPhase.legacy, child: content);
   }
 
   Widget _buildProfileHeader(dynamic profile) {

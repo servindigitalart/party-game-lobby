@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/bufon_phase.dart';
 import '../../models/user_profile.dart';
 import '../../models/title.dart' as bufon_title;
 import '../../models/avatar.dart';
@@ -97,7 +98,13 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileFutureProvider(widget.userId));
 
-    return Scaffold(
+    // Fase 2B WP1: authored against `AppTheme.legacyTheme`, still painting
+    // legacy dark surfaces. Fase 2A made `lightTheme` the app theme and a
+    // pushed route does not inherit the pusher's `Theme`, so the SliverAppBar
+    // chrome and unstyled `Text` resolved to Ink on dark. `BufonPhase.legacy`
+    // is the documented opt-in that restores the theme this screen was
+    // written for. Migration boundary marker, not an endorsement.
+    final content = Scaffold(
       backgroundColor: AppColors.background,
       body: profileAsync.when(
         data: (profile) => _buildProfileContent(profile),
@@ -105,6 +112,8 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
         error: (error, stack) => _buildErrorState(error.toString()),
       ),
     );
+
+    return PhaseScope(phase: BufonPhase.legacy, child: content);
   }
 
   Widget _buildProfileContent(UserProfile profile) {
