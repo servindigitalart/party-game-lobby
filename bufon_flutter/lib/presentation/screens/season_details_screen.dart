@@ -7,6 +7,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/bufon_phase.dart';
+import '../widgets/bufon_loader.dart';
+import '../widgets/bufon_placeholder.dart';
 import '../../models/season.dart';
 import '../../providers/leaderboard_providers.dart';
 import '../../providers/game_providers.dart';
@@ -238,16 +240,8 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
             leaderboardAsync.when(
               data: (entries) {
                 if (entries.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Text(
-                        'No hay datos de clasificación',
-                        style: AppTypography.body1.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
+                  return const BufonPlaceholder(
+                    title: 'Todavía no hay clasificación',
                   );
                 }
 
@@ -327,20 +321,13 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
                   }).toList(),
                 );
               },
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(AppSpacing.xl),
-                  child: CircularProgressIndicator(),
-                ),
+              loading: () => const Padding(
+                padding: EdgeInsets.all(AppSpacing.xl),
+                child: Center(child: BufonLoader()),
               ),
-              error: (_, __) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Text(
-                    'Error al cargar la clasificación',
-                    style: AppTypography.body1.copyWith(color: AppColors.error),
-                  ),
-                ),
+              error: (_, __) => const BufonPlaceholder(
+                variant: BufonPlaceholderVariant.error,
+                title: 'No se pudo cargar la clasificación',
               ),
             ),
             const SizedBox(height: AppSpacing.xxxl),

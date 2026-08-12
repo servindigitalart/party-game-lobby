@@ -8,6 +8,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/bufon_phase.dart';
+import '../widgets/bufon_loader.dart';
+import '../widgets/bufon_placeholder.dart';
 import '../../models/user_profile.dart';
 import '../../models/title.dart' as bufon_title;
 import '../../models/avatar.dart';
@@ -108,8 +110,8 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
       backgroundColor: AppColors.background,
       body: profileAsync.when(
         data: (profile) => _buildProfileContent(profile),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => _buildErrorState(error.toString()),
+        loading: () => const Center(child: BufonLoader()),
+        error: (error, stack) => _buildErrorState(),
       ),
     );
 
@@ -590,11 +592,7 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
       ),
       child: Row(
         children: [
-          const SizedBox(
-            width: 32,
-            height: 32,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+          const BufonLoader.small(),
           const SizedBox(width: AppSpacing.md),
           Text(
             label,
@@ -647,31 +645,14 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
     );
   }
 
-  Widget _buildErrorState(String error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: AppColors.error),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Error al cargar perfil',
-              style: AppTypography.h2,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              error,
-              style: AppTypography.body1.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+  Widget _buildErrorState() {
+    // This was the app's most direct copy leak: the raw exception string was
+    // rendered as the placeholder's body text, so a Firestore permission
+    // message or a network stack trace could appear in front of a player
+    // (Capítulo 26). The exception is no longer passed in at all.
+    return const BufonPlaceholder(
+      variant: BufonPlaceholderVariant.error,
+      title: 'No se pudo cargar el perfil',
     );
   }
 
@@ -772,7 +753,7 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al compartir: $e'),
+          content: const Text('No se pudo compartir. Inténtalo de nuevo.'),
           backgroundColor: AppColors.error,
         ),
       );

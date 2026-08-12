@@ -5,6 +5,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/title.dart';
+import '../widgets/bufon_loader.dart';
+import '../widgets/bufon_placeholder.dart';
 import '../../providers/title_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/haptic_service.dart';
@@ -120,22 +122,13 @@ class TitleSelectorDialog extends ConsumerWidget {
                     },
                   );
                 },
-                loading: () => const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(AppSpacing.xl),
-                    child: CircularProgressIndicator(),
-                  ),
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(AppSpacing.xl),
+                  child: Center(child: BufonLoader()),
                 ),
-                error: (error, stack) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    child: Text(
-                      'Error al cargar títulos',
-                      style: AppTypography.body1.copyWith(
-                        color: AppColors.error,
-                      ),
-                    ),
-                  ),
+                error: (error, stack) => const BufonPlaceholder(
+                  variant: BufonPlaceholderVariant.error,
+                  title: 'No se pudieron cargar los títulos',
                 ),
               ),
             ),

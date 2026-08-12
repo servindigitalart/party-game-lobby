@@ -7,6 +7,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/bufon_phase.dart';
+import '../widgets/bufon_loader.dart';
+import '../widgets/bufon_placeholder.dart';
 import '../../models/achievement.dart';
 import '../../models/avatar.dart';
 import '../../providers/progression_providers.dart';
@@ -82,7 +84,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       body: profileAsync.when(
         data: (profile) {
           if (profile == null) {
-            return const Center(child: Text('No se pudo cargar el perfil'));
+            return const BufonPlaceholder(
+              variant: BufonPlaceholderVariant.error,
+              title: 'No se pudo cargar el perfil',
+            );
           }
 
           return Column(
@@ -115,8 +120,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text('Error: $error')),
+        loading: () => const Center(child: BufonLoader()),
+        error: (error, stack) => const BufonPlaceholder(
+          variant: BufonPlaceholderVariant.error,
+          title: 'No se pudo cargar el perfil',
+        ),
       ),
     );
 
@@ -505,7 +513,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: const Text(
+              'No se pudo equipar el avatar. Inténtalo de nuevo.',
+            ),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(

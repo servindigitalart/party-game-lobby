@@ -18,6 +18,8 @@ import '../core/telemetry/game_telemetry_service.dart';
 import '../core/logging/log_category.dart';
 import '../presentation/transitions/keyhole_reveal_transition.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../presentation/widgets/bufon_loader.dart';
+import '../presentation/widgets/bufon_placeholder.dart';
 import '../presentation/widgets/confetti_widget.dart';
 import '../services/haptic_service.dart';
 import '../presentation/navigation/page_transitions.dart';
@@ -164,13 +166,18 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
       data: (room) {
         if (room == null) {
           return const Scaffold(
-            body: Center(child: Text('Sala no encontrada')),
+            body: BufonPlaceholder(
+              variant: BufonPlaceholderVariant.error,
+              title: 'Sala no encontrada',
+            ),
           );
         }
 
         if (room.players.isEmpty) {
           return const Scaffold(
-            body: Center(child: Text('No hay jugadores en la sala')),
+            body: BufonPlaceholder(
+              title: 'No hay jugadores en la sala',
+            ),
           );
         }
 
@@ -347,10 +354,13 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stack) =>
-          Scaffold(body: Center(child: Text('Error: $error'))),
+      loading: () => const Scaffold(body: Center(child: BufonLoader())),
+      error: (error, stack) => const Scaffold(
+        body: BufonPlaceholder(
+          variant: BufonPlaceholderVariant.error,
+          title: 'No se pudo cargar el resultado',
+        ),
+      ),
     );
 
     // Wrapped around `when` rather than around each branch so the loading

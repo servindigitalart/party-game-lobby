@@ -17,6 +17,8 @@ import '../core/theme/bufon_phase.dart';
 import '../core/theme/motion_tokens.dart';
 import '../presentation/widgets/game_card.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../presentation/widgets/bufon_loader.dart';
+import '../presentation/widgets/bufon_placeholder.dart';
 import '../presentation/widgets/game_progress_widgets.dart';
 import '../presentation/navigation/page_transitions.dart';
 import '../services/haptic_service.dart';
@@ -420,10 +422,13 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stack) =>
-          Scaffold(body: Center(child: Text('Error: $error'))),
+      loading: () => const Scaffold(body: Center(child: BufonLoader())),
+      error: (error, stack) => const Scaffold(
+        body: BufonPlaceholder(
+          variant: BufonPlaceholderVariant.error,
+          title: 'No se pudo cargar la votación',
+        ),
+      ),
     );
   }
 }

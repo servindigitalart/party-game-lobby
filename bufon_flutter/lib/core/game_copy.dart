@@ -39,6 +39,17 @@ class GameCopy {
     return variants[(ready + total) % variants.length];
   }
 
+  // Placeholder voice copy (Capítulo 25/26). These are the *supporting*
+  // lines — each call site supplies its own title, because only it knows
+  // which noun failed or is missing. Deliberately free of technical detail:
+  // the exception already reaches AppLogger/Crashlytics, and a player can do
+  // nothing with a Firebase error code.
+  static const placeholderEmpty = 'Todavía no hay nada por aquí.';
+  static const placeholderError =
+      'No se pudo cargar. Inténtalo de nuevo en un momento.';
+  static const placeholderOffline =
+      'Parece que no hay conexión. Revisa tu internet.';
+
   static const revealingAnswers = 'Revelando respuestas...';
   static const countingVotes = 'Contando votos...';
   static const nextRound = 'Siguiente ronda...';

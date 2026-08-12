@@ -6,6 +6,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/bufon_phase.dart';
+import '../widgets/bufon_loader.dart';
+import '../widgets/bufon_placeholder.dart';
 import '../../models/leaderboard_entry.dart';
 import '../../models/avatar.dart';
 import '../../providers/leaderboard_providers.dart';
@@ -177,8 +179,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => _buildErrorState(error.toString()),
+        loading: () => const Center(child: BufonLoader()),
+        error: (error, stack) => _buildErrorState(),
       ),
     );
   }
@@ -497,70 +499,28 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
   }
 
   Widget _buildEmptyState(LeaderboardType type) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.emoji_events_outlined,
-              size: 64,
-              color: AppColors.textSecondary,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              '¡Sé el primero!',
-              style: AppTypography.h2,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Juega partidas para aparecer en el ranking ${type.displayName}',
-              style: AppTypography.body1.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    // Capítulo 25 asks for the brand illustration in empty states — the
+    // `empty` variant is the one that shows the isotype, replacing the
+    // 64 px `Icons.emoji_events_outlined` the audit flagged.
+    return BufonPlaceholder(
+      title: '¡Sé el primero!',
+      message:
+          'Juega partidas para aparecer en el ranking ${type.displayName}',
     );
   }
 
-  Widget _buildErrorState(String error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: AppColors.error),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Error al cargar',
-              style: AppTypography.h2,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'No se pudo cargar el ranking. Intenta de nuevo.',
-              style: AppTypography.body1.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            ElevatedButton(
-              onPressed: () {
-                ref.invalidate(topPlayersProvider);
-                ref.invalidate(userRankProvider);
-              },
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      ),
+  Widget _buildErrorState() {
+    // The exception is no longer taken as a parameter: it was only ever
+    // stringified into the caller and never shown, and dropping it removes
+    // the temptation to render it (Capítulo 26).
+    return BufonPlaceholder(
+      variant: BufonPlaceholderVariant.error,
+      title: 'No se pudo cargar el ranking',
+      actionLabel: 'Reintentar',
+      onAction: () {
+        ref.invalidate(topPlayersProvider);
+        ref.invalidate(userRankProvider);
+      },
     );
   }
 }

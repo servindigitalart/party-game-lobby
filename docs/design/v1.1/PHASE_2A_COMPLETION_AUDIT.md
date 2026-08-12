@@ -463,7 +463,15 @@ site away and each one left dead makes the system less trustworthy to the next c
 
 ---
 
-#### WP2 — Shared surface primitives: `BufonLoader` + `BufonPlaceholder`
+#### WP2 — Shared surface primitives: `BufonLoader` + `BufonPlaceholder` — **DONE (2026-08-11, uncommitted)**
+
+> **Amendment.** All four acceptance criteria met: `CircularProgressIndicator`
+> 16 → 2 (both nested inside another component — a button and a SnackBar); zero raw
+> exception strings in any screen; the loader honours reduced motion (static mark, ticker
+> stopped); `flutter analyze` 0 issues, `flutter test` 161 passing (151 pre-existing + 10 new).
+> 14 `BufonLoader` and 14 `BufonPlaceholder` call sites. Full detail in
+> `WP2_LOADER_PLACEHOLDER_REPORT.md`. Closes SWA-8's `MotionPhysics` half.
+
 
 - **Objective:** one loading component and one empty/error component, adopted everywhere; no
   raw exception text reaches a player

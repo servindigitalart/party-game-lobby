@@ -383,7 +383,7 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al compartir: $e'),
+            content: const Text('No se pudo compartir. Inténtalo de nuevo.'),
             backgroundColor: AppColors.error,
           ),
         );

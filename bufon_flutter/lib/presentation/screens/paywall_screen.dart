@@ -5,6 +5,7 @@ import '../../core/logging/log_category.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/bufon_phase.dart';
+import '../widgets/bufon_loader.dart';
 import '../../services/ad_service.dart';
 import '../../services/iap_service.dart';
 import '../../data/repositories/room_repository.dart';
@@ -104,7 +105,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
         severity: AppLogLevel.warning,
       );
       if (mounted) {
-        _showError('Error al mostrar el anuncio: $e');
+        _showError('No se pudo mostrar el anuncio. Inténtalo de nuevo.');
       }
     } finally {
       if (mounted) {
@@ -157,7 +158,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
         severity: AppLogLevel.warning,
       );
       if (mounted) {
-        _showError('Error al procesar la compra: $e');
+        _showError('No se pudo completar la compra. Inténtalo de nuevo.');
       }
     } finally {
       if (mounted) {
@@ -198,9 +199,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFE94560)),
-              )
+            ? const Center(child: BufonLoader())
             : SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(

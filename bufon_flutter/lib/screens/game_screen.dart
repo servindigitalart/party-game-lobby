@@ -16,6 +16,8 @@ import '../core/theme/bufon_phase.dart';
 import '../core/theme/motion_tokens.dart';
 import '../presentation/widgets/timer_widget.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../presentation/widgets/bufon_loader.dart';
+import '../presentation/widgets/bufon_placeholder.dart';
 import '../presentation/widgets/game_progress_widgets.dart';
 import '../presentation/navigation/page_transitions.dart';
 import '../services/haptic_service.dart';
@@ -255,9 +257,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _navigateToHomeWithMessage('La sala se cerró por desconexión');
           });
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: BufonLoader()));
         }
 
         if (room.phase == GamePhase.voting) {
@@ -279,9 +279,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _navigateToHomeWithMessage('Saliste de la sala.');
           });
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: BufonLoader()));
         }
         final isHost = room.hostId == userId;
         final allAnswered = room.players.every((p) => p.currentAnswer != null);
@@ -508,25 +506,21 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         );
       },
       loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+          const Scaffold(body: Center(child: BufonLoader())),
       error: (error, stack) => Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Error: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
-                child: const Text('Volver al Inicio'),
-              ),
-            ],
-          ),
+        body: BufonPlaceholder(
+          variant: BufonPlaceholderVariant.error,
+          title: 'Se perdió la sala',
+          // The exception itself is already on its way to
+          // AppLogger/Crashlytics through the repository layer; a player can
+          // do nothing with a Firestore error string.
+          actionLabel: 'Volver al Inicio',
+          onAction: () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              (route) => false,
+            );
+          },
         ),
       ),
     );

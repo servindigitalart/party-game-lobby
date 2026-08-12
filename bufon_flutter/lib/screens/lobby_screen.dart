@@ -21,6 +21,8 @@ import '../core/telemetry/telemetry_event.dart';
 import '../presentation/navigation/page_transitions.dart';
 import '../presentation/screens/paywall_screen.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../presentation/widgets/bufon_loader.dart';
+import '../presentation/widgets/bufon_placeholder.dart';
 import '../services/haptic_service.dart';
 import 'game_screen.dart';
 import 'home_screen.dart';
@@ -216,9 +218,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _navigateToHomeWithMessage('La sala se cerró por desconexión');
           });
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: BufonLoader()));
         }
 
         // Navigate to game if already started
@@ -394,10 +394,13 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stack) =>
-          Scaffold(body: Center(child: Text('Error: $error'))),
+      loading: () => const Scaffold(body: Center(child: BufonLoader())),
+      error: (error, stack) => const Scaffold(
+        body: BufonPlaceholder(
+          variant: BufonPlaceholderVariant.error,
+          title: 'No se pudo cargar la sala',
+        ),
+      ),
     );
   }
 }
