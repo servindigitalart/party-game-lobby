@@ -493,7 +493,20 @@ site away and each one left dead makes the system less trustworthy to the next c
 
 ---
 
-#### WP3 — Ceremonial Final Winner
+#### WP3 — Ceremonial Final Winner — **DONE (2026-08-11, uncommitted)**
+
+> **Amendment.** All five acceptance criteria met: zero `Color(0x…)` / `AppColors.gold` /
+> `primary` in the file (19 → 0); `ConfettiTier.night` and `AppElevation.ceremonialGradient`
+> each have a call site; `celebration()` fires exactly once, on arrival; the share CTA is
+> **unchanged** (still winner-only — ungating is presentation-only but changes behaviour, so it
+> was left to the share work package per the brief); the share card still renders and exports.
+> Also closes SWA-4, SWA-5 and the `displayButter` half of the typography backlog, and adopts
+> `BufonPhase.nightWinner` (SWA-1's last game-loop value). `flutter analyze` 0 issues,
+> `flutter test` 171 passing (161 pre-existing + 10 new). Final Winner **3.5 → 7.5**.
+> Full detail in `WP3_FINAL_WINNER_REPORT.md`, including a **pre-existing** defect it
+> uncovered: `ShareVictoryCard` overflows its own declared frame by 470 px, so every shared
+> victory card has been clipped.
+
 
 - **Objective:** the night ends on the ceremony the design system already describes
 - **Affected:** FinalWinner, `share_victory_card.dart`

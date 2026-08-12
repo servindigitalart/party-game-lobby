@@ -186,7 +186,7 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
             context.replaceFadeSlide(const GameScreen());
           });
         } else if (room.phase == GamePhase.finalWinner) {
-          final sortedPlayers = List.from(room.players)
+          final sortedPlayers = [...room.players]
             ..sort((a, b) => b.score.compareTo(a.score));
           final winner = sortedPlayers.first;
           final votesReceived = room.players
@@ -219,6 +219,9 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
                 votesReceived: votesReceived,
                 totalScore: winner.score,
                 isCurrentUserWinner: winner.id == userId,
+                // Already sorted and already in memory — the ceremony's
+                // standings section needs no query of its own.
+                standings: sortedPlayers,
               ),
             );
           });
