@@ -350,13 +350,16 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                                 AppColors.sky,
                               ),
                             ),
-                            child: Text(
-                              room.currentQuestionText ?? '',
-                              style: AppTypography.h2.copyWith(
-                                color: AppColors.paper,
-                                height: 1.3,
+                            child: Semantics(
+                              header: true,
+                              child: Text(
+                                room.currentQuestionText ?? '',
+                                style: AppTypography.h2.copyWith(
+                                  color: AppColors.paper,
+                                  height: 1.3,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              textAlign: TextAlign.center,
                             ),
                           ),
                           const SizedBox(height: AppSpacing.xl),
@@ -375,10 +378,13 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                           ],
 
                           if (!hasAnswered) ...[
-                            Text(
-                              'Tu respuesta:',
-                              style: AppTypography.h4.copyWith(
-                                color: AppColors.paper,
+                            Semantics(
+                              header: true,
+                              child: Text(
+                                'Tu respuesta:',
+                                style: AppTypography.h4.copyWith(
+                                  color: AppColors.paper,
+                                ),
                               ),
                             ),
                             const SizedBox(height: AppSpacing.sm),
@@ -479,13 +485,28 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                           borderRadius: BorderRadius.circular(3),
                         ),
                         const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          '${GameCopy.answerProgress(answeredCount, room.players.length)}\n'
-                          '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.paper.withValues(alpha: 0.72),
+                        // Announced once, when the last answer lands — not on
+                        // every player's answer, which is up to eight
+                        // announcements a round, and not on the progress bar's
+                        // every frame. While the room is still answering the
+                        // node stays readable on focus but silent, which also
+                        // keeps `answerWaiting`'s rotating variants from
+                        // re-announcing the same state.
+                        Semantics(
+                          liveRegion: allAnswered,
+                          label: allAnswered
+                              ? 'Todos respondieron'
+                              : '${GameCopy.answerProgress(answeredCount, room.players.length)}. '
+                                    '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
+                          excludeSemantics: true,
+                          child: Text(
+                            '${GameCopy.answerProgress(answeredCount, room.players.length)}\n'
+                            '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.paper.withValues(alpha: 0.72),
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
@@ -505,8 +526,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: BufonLoader())),
+      loading: () => const Scaffold(body: Center(child: BufonLoader())),
       error: (error, stack) => Scaffold(
         body: BufonPlaceholder(
           variant: BufonPlaceholderVariant.error,

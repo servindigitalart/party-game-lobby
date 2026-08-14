@@ -100,13 +100,16 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
               size: 64,
             ),
             const SizedBox(height: AppSpacing.md),
-            Text(
-              widget.season.name,
-              style: AppTypography.h1.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
+            Semantics(
+              header: true,
+              child: Text(
+                widget.season.name,
+                style: AppTypography.h1.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
@@ -133,11 +136,14 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Recompensas',
-              style: AppTypography.h2.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
+            Semantics(
+              header: true,
+              child: Text(
+                'Recompensas',
+                style: AppTypography.h2.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -174,47 +180,53 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
     required IconData icon,
     required Color color,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
+    // Rank and reward are two sibling `Text` nodes plus a decorative icon;
+    // unmerged they read as "Top 1" then, separately, the prize it belongs to.
+    return Semantics(
+      label: '$rank: $reward',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 28),
             ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  rank,
-                  style: AppTypography.body1.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.bold,
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    rank,
+                    style: AppTypography.body1.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  reward,
-                  style: AppTypography.body2.copyWith(
-                    color: AppColors.textSecondary,
+                  const SizedBox(height: 2),
+                  Text(
+                    reward,
+                    style: AppTypography.body2.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -229,11 +241,14 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Clasificación Actual',
-              style: AppTypography.h2.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
+            Semantics(
+              header: true,
+              child: Text(
+                'Clasificación Actual',
+                style: AppTypography.h2.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -262,60 +277,77 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
                       highlightColor = AppColors.accent;
                     }
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: isCurrentUser
-                            ? AppColors.primary.withValues(alpha: 0.1)
-                            : AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color:
-                              highlightColor?.withValues(alpha: 0.5) ??
-                              AppColors.border,
-                          width: isCurrentUser ? 2 : 1,
+                    // One node per row, matching the pattern already applied to
+                    // `leaderboard_screen`. Unmerged, a row announced a bare
+                    // '#3', a premium glyph, a nickname and a bare XP figure
+                    // with no relationship between them, and "this is you" was
+                    // carried by fill and border width alone.
+                    return Semantics(
+                      label: [
+                        'Puesto ${rank ?? '-'}',
+                        entry.nickname,
+                        if (isCurrentUser) 'tú',
+                        if (isTop1) 'primer lugar',
+                        '${entry.xp} XP',
+                      ].join(', '),
+                      excludeSemantics: true,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: isCurrentUser
+                              ? AppColors.primary.withValues(alpha: 0.1)
+                              : AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color:
+                                highlightColor?.withValues(alpha: 0.5) ??
+                                AppColors.border,
+                            width: isCurrentUser ? 2 : 1,
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 40,
-                            child: Text(
-                              '#$rank',
-                              style: AppTypography.h3.copyWith(
-                                color: highlightColor ?? AppColors.textPrimary,
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 40,
+                              child: Text(
+                                '#$rank',
+                                style: AppTypography.h3.copyWith(
+                                  color:
+                                      highlightColor ?? AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            if (isTop1)
+                              const Icon(
+                                Icons.workspace_premium,
+                                color: AppColors.gold,
+                                size: 24,
+                              ),
+                            if (isTop1) const SizedBox(width: AppSpacing.xs),
+                            Expanded(
+                              child: Text(
+                                entry.nickname,
+                                style: AppTypography.body1.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: isCurrentUser
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${entry.xp} XP',
+                              style: AppTypography.body2.copyWith(
+                                color:
+                                    highlightColor ?? AppColors.textSecondary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          if (isTop1)
-                            const Icon(
-                              Icons.workspace_premium,
-                              color: AppColors.gold,
-                              size: 24,
-                            ),
-                          if (isTop1) const SizedBox(width: AppSpacing.xs),
-                          Expanded(
-                            child: Text(
-                              entry.nickname,
-                              style: AppTypography.body1.copyWith(
-                                color: AppColors.textPrimary,
-                                fontWeight: isCurrentUser
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '${entry.xp} XP',
-                            style: AppTypography.body2.copyWith(
-                              color: highlightColor ?? AppColors.textSecondary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   }).toList(),

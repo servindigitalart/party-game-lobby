@@ -109,16 +109,14 @@ class _AnimatedPrimaryButtonState extends State<AnimatedPrimaryButton>
     // (forward, on tap-down), release with a small overshoot back to rest
     // (reverse, on tap-up/cancel) — asymmetric on purpose, see Capítulo
     // BRAND PHYSICS in BUFON_DESIGN_SYSTEM.md.
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: MotionScale.pressStrong,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: MotionCurves.compress,
-        reverseCurve: MotionCurves.release,
-      ),
-    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: MotionScale.pressStrong)
+        .animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: MotionCurves.compress,
+            reverseCurve: MotionCurves.release,
+          ),
+        );
   }
 
   @override
@@ -171,6 +169,11 @@ class _AnimatedPrimaryButtonState extends State<AnimatedPrimaryButton>
       button: true,
       enabled: !isDisabled,
       label: widget.semanticLabel ?? widget.text,
+      // Fase 2B WP4: the action has to be re-declared here. `excludeSemantics`
+      // drops the whole subtree, and the tap action belongs to the
+      // `GestureDetector` inside it — so without this the node was announced
+      // as a button that VoiceOver/TalkBack could focus but never activate.
+      onTap: widget.onPressed,
       // The visible Text is already announced through `label`; letting it
       // through as well makes a screen reader read the button twice.
       excludeSemantics: true,

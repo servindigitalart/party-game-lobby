@@ -136,9 +136,7 @@ class _TimerWidgetState extends State<TimerWidget>
           decoration: BoxDecoration(
             color: timerColor.withValues(alpha: 0.12),
             borderRadius: AppShapes.borderRadiusMd,
-            border: AppShapes.focusBorder(
-              timerColor.withValues(alpha: 0.35),
-            ),
+            border: AppShapes.focusBorder(timerColor.withValues(alpha: 0.35)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -161,11 +159,18 @@ class _TimerWidgetState extends State<TimerWidget>
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              Text(
-                '${widget.remainingSeconds}s',
-                style: AppTypography.tabular(AppTypography.h3).copyWith(
-                  color: timerColor,
-                  fontWeight: FontWeight.bold,
+              // Fase 2B WP4: flexible so the Row cannot overflow at the top of
+              // the text-scale band. At most three characters ("90s"), so it
+              // never actually ellipsizes at any real scale — this only removes
+              // the countdown as a source of overflow pressure.
+              Flexible(
+                child: Text(
+                  '${widget.remainingSeconds}s',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.tabular(
+                    AppTypography.h3,
+                  ).copyWith(color: timerColor, fontWeight: FontWeight.bold),
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -175,6 +180,8 @@ class _TimerWidgetState extends State<TimerWidget>
                   child: Text(
                     urgencyCopy,
                     key: ValueKey(urgencyCopy),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: AppTypography.caption.copyWith(
                       color: phase.onSurfaceMuted,
                     ),

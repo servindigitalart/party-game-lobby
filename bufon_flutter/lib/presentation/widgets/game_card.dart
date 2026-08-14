@@ -78,16 +78,14 @@ class _GameCardState extends State<GameCard>
     // BRAND PHYSICS "Compresión y Resorte" (see BUFON_DESIGN_SYSTEM.md):
     // the tactile press feedback compresses fast and releases with a small
     // overshoot, asymmetric on purpose.
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: MotionScale.pressSubtle,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: MotionCurves.compress,
-        reverseCurve: MotionCurves.release,
-      ),
-    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: MotionScale.pressSubtle)
+        .animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: MotionCurves.compress,
+            reverseCurve: MotionCurves.release,
+          ),
+        );
     // The selection-confirm pulse is driven by didUpdateWidget calling
     // forward() then reverse() back-to-back, not by direct touch — it
     // keeps the symmetric Pulse curve (Capítulo 16), not compress/release.
@@ -148,6 +146,11 @@ class _GameCardState extends State<GameCard>
       enabled: !widget.isDisabled,
       selected: widget.isSelected,
       label: widget.semanticLabel ?? widget.text,
+      // Fase 2B WP4: re-declared because `excludeSemantics` drops the subtree
+      // that owns the gesture. Without it every answer in the voting round was
+      // a focusable button that a screen reader could not press — the core
+      // loop was unplayable with assistive technology.
+      onTap: widget.isDisabled ? null : widget.onTap,
       excludeSemantics: true,
       child: GestureDetector(
         onTapDown: _handleTapDown,
@@ -210,11 +213,7 @@ class _GameCardState extends State<GameCard>
                 ],
                 if (widget.isSelected) ...[
                   const SizedBox(width: AppSpacing.sm),
-                  Icon(
-                    Icons.check_circle,
-                    color: selectedForeground,
-                    size: 24,
-                  ),
+                  Icon(Icons.check_circle, color: selectedForeground, size: 24),
                 ],
               ],
             ),

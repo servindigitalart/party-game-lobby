@@ -57,6 +57,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
         elevation: 0,
         actions: [
           IconButton(
+            tooltip: 'Actualizar rankings',
             icon: const Icon(Icons.refresh),
             onPressed: () {
               HapticService.lightImpact();
@@ -212,66 +213,72 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
     final height = place == 1 ? 120.0 : 100.0;
     final iconSize = place == 1 ? 48.0 : 40.0;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Crown for 1st place
-        if (place == 1) const Text('👑', style: TextStyle(fontSize: 32)),
-        if (place == 1) const SizedBox(height: AppSpacing.xs),
+    return Semantics(
+      label: 'Puesto $place, ${entry.nickname}',
+      excludeSemantics: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Crown for 1st place
+          if (place == 1) const Text('👑', style: TextStyle(fontSize: 32)),
+          if (place == 1) const SizedBox(height: AppSpacing.xs),
 
-        // Avatar
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color.withValues(alpha: 0.2),
-            border: Border.all(color: color, width: 3),
+          // Avatar
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withValues(alpha: 0.2),
+              border: Border.all(color: color, width: 3),
+            ),
+            child: Center(
+              child: Text(avatar.emoji, style: const TextStyle(fontSize: 32)),
+            ),
           ),
-          child: Center(
-            child: Text(avatar.emoji, style: const TextStyle(fontSize: 32)),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.xs),
 
-        // Nickname
-        SizedBox(
-          width: 80,
-          child: Text(
-            entry.nickname,
-            style: AppTypography.body2.copyWith(fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          // Nickname
+          SizedBox(
+            width: 80,
+            child: Text(
+              entry.nickname,
+              style: AppTypography.body2.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.xs),
 
-        // Podium
-        Container(
-          width: 80,
-          height: height,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.3),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-            border: Border.all(color: color, width: 2),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(_getMedalIcon(place), color: color, size: iconSize),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                '#$place',
-                style: AppTypography.h3.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                ),
+          // Podium
+          Container(
+            width: 80,
+            height: height,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.3),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(8),
               ),
-            ],
+              border: Border.all(color: color, width: 2),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(_getMedalIcon(place), color: color, size: iconSize),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '#$place',
+                  style: AppTypography.h3.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -361,126 +368,140 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
 
     final statValue = entry.getStatValue(type);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: isCurrentUser
-            ? AppColors.primary.withValues(alpha: 0.1)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
+    // One node per row. Read as separate fragments a row announced a bare
+    // '#3', an emoji glyph, a nickname, 'Nivel 4' and a bare number with no
+    // relationship between them; rank was otherwise carried by border colour
+    // and medal tint alone.
+    return Semantics(
+      label: [
+        'Puesto ${entry.rank ?? '-'}',
+        entry.nickname,
+        if (isCurrentUser) 'tú',
+        'nivel ${entry.level}',
+        '$statValue ${type.statLabel}',
+      ].join(', '),
+      excludeSemantics: true,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
           color: isCurrentUser
-              ? AppColors.primary
-              : isTop3
-              ? _getTop3Color(entry.rank!)
-              : Colors.transparent,
-          width: isCurrentUser || isTop3 ? 2 : 0,
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isCurrentUser
+                ? AppColors.primary
+                : isTop3
+                ? _getTop3Color(entry.rank!)
+                : Colors.transparent,
+            width: isCurrentUser || isTop3 ? 2 : 0,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          // Rank
-          SizedBox(
-            width: 40,
-            child: Text(
-              '#${entry.rank}',
-              style: AppTypography.h3.copyWith(
-                color: isTop3
-                    ? _getTop3Color(entry.rank!)
-                    : AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
+        child: Row(
+          children: [
+            // Rank
+            SizedBox(
+              width: 40,
+              child: Text(
+                '#${entry.rank}',
+                style: AppTypography.h3.copyWith(
+                  color: isTop3
+                      ? _getTop3Color(entry.rank!)
+                      : AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: AppSpacing.md),
 
-          // Avatar
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isTop3
-                  ? _getTop3Color(entry.rank!).withValues(alpha: 0.2)
-                  : AppColors.background,
+            // Avatar
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isTop3
+                    ? _getTop3Color(entry.rank!).withValues(alpha: 0.2)
+                    : AppColors.background,
+              ),
+              child: Center(
+                child: Text(avatar.emoji, style: const TextStyle(fontSize: 24)),
+              ),
             ),
-            child: Center(
-              child: Text(avatar.emoji, style: const TextStyle(fontSize: 24)),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: AppSpacing.md),
 
-          // Nickname and level
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        entry.nickname,
-                        style: AppTypography.body1.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isCurrentUser) ...[
-                      const SizedBox(width: AppSpacing.xs),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+            // Nickname and level
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
                         child: Text(
-                          'TÚ',
-                          style: AppTypography.caption.copyWith(
-                            color: Colors.white,
+                          entry.nickname,
+                          style: AppTypography.body1.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (isCurrentUser) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xs,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'TÚ',
+                            style: AppTypography.caption.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                const SizedBox(height: 2),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Nivel ${entry.level}',
+                    style: AppTypography.body2.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Stat value
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
                 Text(
-                  'Nivel ${entry.level}',
-                  style: AppTypography.body2.copyWith(
+                  '$statValue',
+                  style: AppTypography.h3.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  type.statLabel,
+                  style: AppTypography.caption.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 ),
               ],
             ),
-          ),
-
-          // Stat value
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '$statValue',
-                style: AppTypography.h3.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                type.statLabel,
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -504,8 +525,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen>
     // 64 px `Icons.emoji_events_outlined` the audit flagged.
     return BufonPlaceholder(
       title: '¡Sé el primero!',
-      message:
-          'Juega partidas para aparecer en el ranking ${type.displayName}',
+      message: 'Juega partidas para aparecer en el ranking ${type.displayName}',
     );
   }
 

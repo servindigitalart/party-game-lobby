@@ -175,9 +175,7 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
 
         if (room.players.isEmpty) {
           return const Scaffold(
-            body: BufonPlaceholder(
-              title: 'No hay jugadores en la sala',
-            ),
+            body: BufonPlaceholder(title: 'No hay jugadores en la sala'),
           );
         }
 
@@ -307,10 +305,13 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
                     // the reveal spoiled by a fix that looked correct.
                     if (_revealStage >= 2) ...[
                       const SizedBox(height: AppSpacing.lg),
-                      Text(
-                        'Marcador de la noche',
-                        style: AppTypography.h4.copyWith(
-                          color: phase.onSurface,
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          'Marcador de la noche',
+                          style: AppTypography.h4.copyWith(
+                            color: phase.onSurface,
+                          ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
@@ -492,9 +493,7 @@ class _WinnerSpotlight extends StatelessWidget {
         // accent-tinted shadow, per Capítulo 8.
         color: AppColors.graphitePlus1,
         borderRadius: AppShapes.borderRadiusXl,
-        border: AppShapes.hairlineBorder(
-          phase.accent.withValues(alpha: 0.45),
-        ),
+        border: AppShapes.hairlineBorder(phase.accent.withValues(alpha: 0.45)),
         boxShadow: AppElevation.protagonistShadow(phase.accent),
       ),
       child: Column(
@@ -595,29 +594,39 @@ class _WinnerSpotlight extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                   )
-                : Column(
+                // The payoff of the whole screen, and it lands *in place* —
+                // no navigation happens, so without a live region a screen
+                // reader is never told the reveal finished. It fires exactly
+                // once: this branch is only built at stage 2, and the label is
+                // fixed for the round, so there is nothing to re-announce.
+                : Semantics(
                     key: ValueKey('author-$winnerName'),
-                    children: [
-                      Text(
-                        winnerName,
-                        // The blueprint's `displayButter`: the accent is
-                        // spent on the one word the whole screen exists to
-                        // deliver, and on nothing else (Capítulo 4 — un solo
-                        // protagonista de color por pantalla).
-                        style: AppTypography.display.copyWith(
-                          color: phase.accent,
+                    liveRegion: true,
+                    label: '$winnerName, $votesReceived votos recibidos',
+                    excludeSemantics: true,
+                    child: Column(
+                      children: [
+                        Text(
+                          winnerName,
+                          // The blueprint's `displayButter`: the accent is
+                          // spent on the one word the whole screen exists to
+                          // deliver, and on nothing else (Capítulo 4 — un solo
+                          // protagonista de color por pantalla).
+                          style: AppTypography.display.copyWith(
+                            color: phase.accent,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        '$votesReceived votos recibidos',
-                        style: AppTypography.body2.copyWith(
-                          color: phase.onSurface,
-                          fontWeight: FontWeight.w700,
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          '$votesReceived votos recibidos',
+                          style: AppTypography.body2.copyWith(
+                            color: phase.onSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
           ),
           if (revealStage >= 2) ...[

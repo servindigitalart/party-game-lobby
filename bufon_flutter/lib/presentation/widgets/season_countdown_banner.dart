@@ -23,77 +23,94 @@ class SeasonCountdownBanner extends ConsumerWidget {
 
         final daysRemaining = season.daysRemaining;
 
-        return GestureDetector(
-          onTap: () {
-            HapticService.lightImpact();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SeasonDetailsScreen(season: season),
-              ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
+        // The banner is a bare `GestureDetector`: nothing announced it as
+        // tappable, and the name, the countdown and a chevron arrived as three
+        // unrelated fragments. The decorative clock emoji is dropped from the
+        // label so a screen reader does not read out "alarm clock".
+        final countdown = _getCountdownText(daysRemaining).replaceAll(' ⏰', '');
+
+        void openSeason() {
+          HapticService.lightImpact();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SeasonDetailsScreen(season: season),
             ),
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(season.themeColor).withValues(alpha: 0.2),
-                  Color(season.themeColor).withValues(alpha: 0.1),
+          );
+        }
+
+        return Semantics(
+          button: true,
+          label: '${season.name}, $countdown',
+          hint: 'Toca para ver los detalles de la temporada',
+          // Declared on the node as well as the gesture: `excludeSemantics`
+          // drops the subtree that owns the tap.
+          onTap: openSeason,
+          excludeSemantics: true,
+          child: GestureDetector(
+            onTap: openSeason,
+            child: Container(
+              margin: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(season.themeColor).withValues(alpha: 0.2),
+                    Color(season.themeColor).withValues(alpha: 0.1),
+                  ],
+                ),
+                border: Border.all(color: Color(season.themeColor), width: 2),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(season.themeColor).withValues(alpha: 0.3),
+                    blurRadius: 10,
+                  ),
                 ],
               ),
-              border: Border.all(color: Color(season.themeColor), width: 2),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(season.themeColor).withValues(alpha: 0.3),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(season.themeColor).withValues(alpha: 0.3),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(season.themeColor).withValues(alpha: 0.3),
+                    ),
+                    child: Icon(
+                      Icons.emoji_events,
+                      color: Color(season.themeColor),
+                      size: 28,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.emoji_events,
-                    color: Color(season.themeColor),
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        season.name,
-                        style: AppTypography.h3.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          season.name,
+                          style: AppTypography.h3.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _getCountdownText(daysRemaining),
-                        style: AppTypography.body2.copyWith(
-                          color: AppColors.textSecondary,
+                        const SizedBox(height: 2),
+                        Text(
+                          _getCountdownText(daysRemaining),
+                          style: AppTypography.body2.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Icon(Icons.chevron_right, color: Color(season.themeColor)),
-              ],
+                  Icon(Icons.chevron_right, color: Color(season.themeColor)),
+                ],
+              ),
             ),
           ),
         );

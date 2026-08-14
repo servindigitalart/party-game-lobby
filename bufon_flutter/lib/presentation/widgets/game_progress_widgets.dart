@@ -52,22 +52,19 @@ class RoundIndicator extends StatelessWidget {
             const SizedBox(width: AppSpacing.xs),
             Text(
               'Ronda ',
-              style: AppTypography.body2.copyWith(
-                color: phase.onSurfaceMuted,
-              ),
+              style: AppTypography.body2.copyWith(color: phase.onSurfaceMuted),
             ),
             Text(
               '$currentRound',
-              style: AppTypography.tabular(AppTypography.body1).copyWith(
-                color: phase.accent,
-                fontWeight: FontWeight.bold,
-              ),
+              style: AppTypography.tabular(
+                AppTypography.body1,
+              ).copyWith(color: phase.accent, fontWeight: FontWeight.bold),
             ),
             Text(
               '/$totalRounds',
-              style: AppTypography.tabular(AppTypography.body2).copyWith(
-                color: phase.onSurfaceMuted,
-              ),
+              style: AppTypography.tabular(
+                AppTypography.body2,
+              ).copyWith(color: phase.onSurfaceMuted),
             ),
           ],
         ),
@@ -127,21 +124,31 @@ class GameProgressBar extends StatelessWidget {
           }),
         ),
         const SizedBox(height: AppSpacing.xs),
+        // Fase 2B WP4: both children are flexible. Two unflexed `Text`s in a
+        // `spaceBetween` Row overran this bar by a wide margin at the top of
+        // the text-scale band, on the screen the game spends most of its time.
+        // The percentage keeps priority because it is three characters and
+        // tabular; the round label is the one that may ellipsize.
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Ronda $currentRound de $totalRounds',
-              style: AppTypography.caption.copyWith(
-                color: phase.onSurfaceMuted,
+            Flexible(
+              child: Text(
+                'Ronda $currentRound de $totalRounds',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption.copyWith(
+                  color: phase.onSurfaceMuted,
+                ),
               ),
             ),
+            const SizedBox(width: AppSpacing.xs),
             Text(
               '${(progress * 100).toInt()}%',
-              style: AppTypography.tabular(AppTypography.caption).copyWith(
-                color: phase.accent,
-                fontWeight: FontWeight.bold,
-              ),
+              maxLines: 1,
+              style: AppTypography.tabular(
+                AppTypography.caption,
+              ).copyWith(color: phase.accent, fontWeight: FontWeight.bold),
             ),
           ],
         ),

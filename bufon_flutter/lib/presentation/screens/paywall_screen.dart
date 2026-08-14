@@ -193,6 +193,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         leading: IconButton(
+          tooltip: 'Cerrar',
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(false),
         ),
@@ -224,13 +225,16 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                     const SizedBox(height: 32),
 
                     // Title
-                    const Text(
-                      '¡Ya jugaron 3 partidas hoy!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    Semantics(
+                      header: true,
+                      child: const Text(
+                        '¡Ya jugaron 3 partidas hoy!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
 
@@ -298,77 +302,91 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     required VoidCallback onTap,
     bool premium = false,
   }) {
-    return InkWell(
+    // These are the only two ways out of the paywall, and they are `InkWell`s:
+    // nothing announced them as buttons, and the icon, title, subtitle,
+    // premium star and chevron arrived as five separate fragments. `enabled`
+    // tracks `_isLoading`, which is what actually nulls `onTap`.
+    return Semantics(
+      button: true,
+      enabled: !_isLoading,
+      label: '$title, $subtitle',
+      // Declared on the node as well as the `InkWell`: `excludeSemantics`
+      // drops the subtree that owns the tap, and these are the only two ways
+      // out of the paywall.
       onTap: _isLoading ? null : onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(16),
-          border: premium
-              ? Border.all(color: const Color(0xFFFFD700), width: 2)
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: _isLoading ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(16),
+            border: premium
+                ? Border.all(color: const Color(0xFFFFD700), width: 2)
+                : null,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              child: Icon(icon, size: 32, color: Colors.white),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 32, color: Colors.white),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                      if (premium) ...[
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.star,
-                          size: 20,
-                          color: Color(0xFFFFD700),
-                        ),
+                        if (premium) ...[
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.star,
+                            size: 20,
+                            color: Color(0xFFFFD700),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.8),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.white.withValues(alpha: 0.6),
-              size: 20,
-            ),
-          ],
+              Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.white.withValues(alpha: 0.6),
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );

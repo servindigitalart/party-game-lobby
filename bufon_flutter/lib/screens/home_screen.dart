@@ -211,12 +211,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          'BUFÓN',
-                          style: AppTypography.display.copyWith(
-                            color: AppColors.ink,
+                        // The screen's heading, so a screen reader can jump to
+                        // it. The `BrandMark` in the app bar announces the same
+                        // word as an *image*, which carries no structure — the
+                        // two are different roles, not a duplicate label.
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            'BUFÓN',
+                            style: AppTypography.display.copyWith(
+                              color: AppColors.ink,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Text(

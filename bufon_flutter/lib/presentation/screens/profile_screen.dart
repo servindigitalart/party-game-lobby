@@ -145,10 +145,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       ),
       child: Column(
         children: [
-          // Selected Avatar
-          Text(
-            Avatars.getById(profile.selectedAvatar)?.emoji ?? '🤡',
-            style: const TextStyle(fontSize: 80),
+          // Selected Avatar. The emoji on its own reaches a screen reader as
+          // an unpronounceable glyph, so the node carries the avatar's real
+          // name and the emoji is excluded.
+          Semantics(
+            label:
+                'Avatar actual: '
+                '${Avatars.getById(profile.selectedAvatar)?.name ?? 'Bufón'}',
+            image: true,
+            excludeSemantics: true,
+            child: Text(
+              Avatars.getById(profile.selectedAvatar)?.emoji ?? '🤡',
+              style: const TextStyle(fontSize: 80),
+            ),
           ),
 
           const SizedBox(height: AppSpacing.md),
@@ -197,13 +206,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: LinearProgressIndicator(
-                  value: profile.levelProgress,
-                  minHeight: 12,
-                  backgroundColor: AppColors.surface,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+              // A bare `LinearProgressIndicator` announces nothing at all,
+              // which makes the fill — the entire point of the bar — visible
+              // only to sighted users.
+              Semantics(
+                label: 'Progreso al nivel ${profile.level + 1}',
+                value: '${profile.xp} de ${profile.xpForNextLevel} XP',
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: profile.levelProgress,
+                    minHeight: 12,
+                    backgroundColor: AppColors.surface,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+                  ),
                 ),
               ),
             ],
@@ -226,21 +242,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   Widget _buildStat(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: AppTypography.h2.copyWith(
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
+    // Value and label are two sibling `Text` nodes; unmerged, a screen reader
+    // reads "12" and "Partidas" as unrelated fragments.
+    return Semantics(
+      label: '$label: $value',
+      excludeSemantics: true,
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: AppTypography.h2.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          label,
-          style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -272,96 +296,122 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     bool isSelected,
     dynamic profile,
   ) {
-    return GestureDetector(
-      onTap: () {
-        if (isUnlocked && !isSelected) {
-          _selectAvatar(avatar.id);
-        } else if (!isUnlocked) {
-          _showAvatarRequirements(avatar);
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.2)
-              : AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.transparent,
-            width: 2,
+    void handleTap() {
+      if (isUnlocked && !isSelected) {
+        _selectAvatar(avatar.id);
+      } else if (!isUnlocked) {
+        _showAvatarRequirements(avatar);
+      }
+    }
+
+    // One node per tile. The tile is a real button built from a
+    // `GestureDetector`, so nothing announced it as actionable, and both of
+    // its states were carried purely by colour, opacity, a rarity dot and a
+    // lock glyph — none of which reach a screen reader.
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      // Declared on the node too: `excludeSemantics` drops the subtree that
+      // owns the gesture.
+      onTap: handleTap,
+      label: [
+        'Avatar ${avatar.name}',
+        avatar.rarity.displayName,
+        if (!isUnlocked) 'bloqueado' else if (isSelected) 'seleccionado',
+      ].join(', '),
+      hint: isUnlocked
+          ? (isSelected ? null : 'Toca para elegir este avatar')
+          : 'Toca para ver cómo desbloquearlo',
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: handleTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.2)
+                : AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : Colors.transparent,
+              width: 2,
+            ),
           ),
-        ),
-        child: Stack(
-          children: [
-            // Rarity indicator
-            Positioned(
-              top: 4,
-              right: 4,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: Color(
-                    int.parse('0xFF${avatar.rarity.color.substring(1)}'),
-                  ),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-
-            // Avatar
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Opacity(
-                    opacity: isUnlocked ? 1.0 : 0.3,
-                    child: Text(
-                      avatar.emoji,
-                      style: const TextStyle(fontSize: 48),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    avatar.name,
-                    style: AppTypography.caption.copyWith(
-                      color: isUnlocked
-                          ? AppColors.textPrimary
-                          : AppColors.textSecondary,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (!isUnlocked)
-                    const Icon(
-                      Icons.lock,
-                      size: 16,
-                      color: AppColors.textSecondary,
-                    ),
-                ],
-              ),
-            ),
-
-            // Selected checkmark
-            if (isSelected)
+          child: Stack(
+            children: [
+              // Rarity indicator
               Positioned(
                 top: 4,
-                left: 4,
+                right: 4,
                 child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Color(
+                      int.parse('0xFF${avatar.rarity.color.substring(1)}'),
+                    ),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.check, size: 12, color: Colors.white),
                 ),
               ),
-          ],
+
+              // Avatar
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Opacity(
+                      opacity: isUnlocked ? 1.0 : 0.3,
+                      child: Text(
+                        avatar.emoji,
+                        style: const TextStyle(fontSize: 48),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      avatar.name,
+                      style: AppTypography.caption.copyWith(
+                        color: isUnlocked
+                            ? AppColors.textPrimary
+                            : AppColors.textSecondary,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (!isUnlocked)
+                      const Icon(
+                        Icons.lock,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                  ],
+                ),
+              ),
+
+              // Selected checkmark
+              if (isSelected)
+                Positioned(
+                  top: 4,
+                  left: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -389,86 +439,104 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   Widget _buildAchievementCard(Achievement achievement, bool isUnlocked) {
-    return GestureDetector(
-      onTap: () {
-        if (!isUnlocked) {
-          _showAchievementRequirements(achievement);
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: isUnlocked
-              ? AppColors.surface
-              : AppColors.surface.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
+    // `button` tracks the real affordance: `onTap` does nothing once the
+    // achievement is unlocked, so announcing an unlocked card as a button
+    // would promise an action that does not exist. Locked/unlocked was
+    // otherwise conveyed only by opacity, border colour and a lock glyph.
+    // Only actionable while locked, so the action is declared only then —
+    // matching `button`, and matching what `onTap` actually does.
+    final VoidCallback? handleTap = isUnlocked
+        ? null
+        : () => _showAchievementRequirements(achievement);
+
+    return Semantics(
+      button: !isUnlocked,
+      label: [
+        'Logro ${achievement.name}',
+        isUnlocked ? 'desbloqueado' : 'bloqueado',
+        achievement.description,
+        '${achievement.xpReward} XP',
+      ].join(', '),
+      hint: isUnlocked ? null : 'Toca para ver cómo desbloquearlo',
+      onTap: handleTap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: handleTap,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
             color: isUnlocked
-                ? AppColors.accent.withValues(alpha: 0.3)
-                : Colors.transparent,
+                ? AppColors.surface
+                : AppColors.surface.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isUnlocked
+                  ? AppColors.accent.withValues(alpha: 0.3)
+                  : Colors.transparent,
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Opacity(
-              opacity: isUnlocked ? 1.0 : 0.3,
-              child: Text(
-                achievement.icon,
-                style: const TextStyle(fontSize: 40),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              achievement.name,
-              style: AppTypography.body1.copyWith(
-                fontWeight: FontWeight.bold,
-                color: isUnlocked
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              achievement.description,
-              style: AppTypography.caption.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: 2,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '+${achievement.xpReward} XP',
-                style: AppTypography.caption.copyWith(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.bold,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Opacity(
+                opacity: isUnlocked ? 1.0 : 0.3,
+                child: Text(
+                  achievement.icon,
+                  style: const TextStyle(fontSize: 40),
                 ),
               ),
-            ),
-            if (!isUnlocked)
-              const Padding(
-                padding: EdgeInsets.only(top: AppSpacing.xs),
-                child: Icon(
-                  Icons.lock,
-                  size: 16,
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                achievement.name,
+                style: AppTypography.body1.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isUnlocked
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                achievement.description,
+                style: AppTypography.caption.copyWith(
                   color: AppColors.textSecondary,
                 ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-          ],
+              const SizedBox(height: AppSpacing.xs),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '+${achievement.xpReward} XP',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (!isUnlocked)
+                const Padding(
+                  padding: EdgeInsets.only(top: AppSpacing.xs),
+                  child: Icon(
+                    Icons.lock,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

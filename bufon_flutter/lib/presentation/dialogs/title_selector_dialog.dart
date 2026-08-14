@@ -56,6 +56,7 @@ class TitleSelectorDialog extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Cerrar',
                     icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () {
                       HapticService.lightImpact();
@@ -178,153 +179,170 @@ class TitleSelectorDialog extends ConsumerWidget {
     BufonTitle? title,
     bool isEquipped,
   ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () async {
-            HapticService.mediumImpact();
-            final controller = ref.read(titleControllerProvider);
-            final userId = ref.read(userIdProvider);
+    // Each option is a selectable `InkWell`. Unlabelled it announced a medal
+    // glyph, a name, a rarity word and an "equipado" badge as four fragments,
+    // and the equipped state was otherwise border colour and width only.
+    final optionLabel = title == null
+        ? 'Sin título, no mostrar ningún título'
+        : '${title.name}, ${title.rarity.displayName}';
 
-            if (userId == null) return;
+    // Named so the semantics node and the `InkWell` share one action:
+    // `excludeSemantics` drops the subtree that owns the gesture, so the node
+    // has to declare the tap itself or a screen reader cannot equip a title.
+    Future<void> applyTitle() async {
+      HapticService.mediumImpact();
+      final controller = ref.read(titleControllerProvider);
+      final userId = ref.read(userIdProvider);
 
-            // This had no catch: the exception escaped an async onTap into
-            // the guarded zone and was reported as a *fatal* crash, while
-            // the dialog closed as if the title had been equipped.
-            try {
-              if (title == null) {
-                await controller.unequipTitle(uid: userId);
-              } else {
-                await controller.equipTitle(uid: userId, titleId: title.id);
-              }
-            } catch (e) {
-              // TitleController already recorded the failure; this only
-              // tells the player, and must not report it a second time.
-              HapticService.error();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'No pudimos cambiar tu título. Intenta de nuevo.',
-                    ),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
-              }
-              return;
-            }
+      if (userId == null) return;
 
-            if (context.mounted) {
-              Navigator.pop(context);
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: isEquipped
-                  ? AppColors.primary.withAlpha((0.1 * 255).toInt())
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isEquipped
-                    ? AppColors.primary
-                    : title != null
-                    ? Color(title.rarity.color)
-                    : AppColors.textSecondary,
-                width: isEquipped ? 2 : 1,
-              ),
+      // This had no catch: the exception escaped an async onTap into
+      // the guarded zone and was reported as a *fatal* crash, while
+      // the dialog closed as if the title had been equipped.
+      try {
+        if (title == null) {
+          await controller.unequipTitle(uid: userId);
+        } else {
+          await controller.equipTitle(uid: userId, titleId: title.id);
+        }
+      } catch (e) {
+        // TitleController already recorded the failure; this only
+        // tells the player, and must not report it a second time.
+        HapticService.error();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No pudimos cambiar tu título. Intenta de nuevo.'),
+              backgroundColor: AppColors.error,
             ),
-            child: Row(
-              children: [
-                // Icon
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: title != null
-                        ? Color(
-                            title.rarity.color,
-                          ).withAlpha((0.2 * 255).toInt())
-                        : AppColors.textSecondary.withAlpha(
-                            (0.2 * 255).toInt(),
-                          ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    title == null ? Icons.close : Icons.military_tech,
-                    color: title != null
-                        ? Color(title.rarity.color)
-                        : AppColors.textSecondary,
-                    size: 20,
-                  ),
+          );
+        }
+        return;
+      }
+
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+    }
+
+    return Semantics(
+      button: true,
+      selected: isEquipped,
+      label: isEquipped ? '$optionLabel, equipado' : optionLabel,
+      onTap: applyTitle,
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: applyTitle,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: isEquipped
+                    ? AppColors.primary.withAlpha((0.1 * 255).toInt())
+                    : AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isEquipped
+                      ? AppColors.primary
+                      : title != null
+                      ? Color(title.rarity.color)
+                      : AppColors.textSecondary,
+                  width: isEquipped ? 2 : 1,
                 ),
-
-                const SizedBox(width: AppSpacing.md),
-
-                // Title info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (title != null) ...[
-                        Text(
-                          title.name,
-                          style: AppTypography.body1.copyWith(
-                            color: Color(title.rarity.color),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          title.rarity.displayName,
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ] else ...[
-                        Text(
-                          'Sin título',
-                          style: AppTypography.body1.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'No mostrar ningún título',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                // Equipped badge
-                if (isEquipped)
+              ),
+              child: Row(
+                children: [
+                  // Icon
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
-                    ),
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
+                      color: title != null
+                          ? Color(
+                              title.rarity.color,
+                            ).withAlpha((0.2 * 255).toInt())
+                          : AppColors.textSecondary.withAlpha(
+                              (0.2 * 255).toInt(),
+                            ),
+                      shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      'EQUIPADO',
-                      style: AppTypography.caption.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                    child: Icon(
+                      title == null ? Icons.close : Icons.military_tech,
+                      color: title != null
+                          ? Color(title.rarity.color)
+                          : AppColors.textSecondary,
+                      size: 20,
+                    ),
+                  ),
+
+                  const SizedBox(width: AppSpacing.md),
+
+                  // Title info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (title != null) ...[
+                          Text(
+                            title.name,
+                            style: AppTypography.body1.copyWith(
+                              color: Color(title.rarity.color),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            title.rarity.displayName,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ] else ...[
+                          Text(
+                            'Sin título',
+                            style: AppTypography.body1.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'No mostrar ningún título',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  // Equipped badge
+                  if (isEquipped)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'EQUIPADO',
+                        style: AppTypography.caption.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

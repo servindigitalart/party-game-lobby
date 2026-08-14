@@ -219,7 +219,12 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
               ],
             ),
             child: Center(
-              child: Text(avatar.emoji, style: const TextStyle(fontSize: 64)),
+              child: Semantics(
+                label: 'Avatar: ${avatar.name}',
+                image: true,
+                excludeSemantics: true,
+                child: Text(avatar.emoji, style: const TextStyle(fontSize: 64)),
+              ),
             ),
           ),
 
@@ -623,22 +628,30 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
       ),
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
+        child: Semantics(
+          button: true,
+          label: 'Compartir perfil',
+          // Declared on the node too: `excludeSemantics` drops the subtree
+          // that owns the `InkWell`'s tap.
           onTap: () => _shareProfile(profile),
-          borderRadius: BorderRadius.circular(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.share, color: Colors.white, size: 24),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Compartir Perfil',
-                style: AppTypography.h3.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+          excludeSemantics: true,
+          child: InkWell(
+            onTap: () => _shareProfile(profile),
+            borderRadius: BorderRadius.circular(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.share, color: Colors.white, size: 24),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  'Compartir Perfil',
+                  style: AppTypography.h3.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

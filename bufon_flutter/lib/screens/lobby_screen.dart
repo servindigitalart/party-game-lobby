@@ -114,10 +114,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: AppColors.coral,
-          ),
+          SnackBar(content: Text(message), backgroundColor: AppColors.coral),
         );
       }
     });
@@ -261,10 +258,13 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                     ),
                     child: Column(
                       children: [
-                        Text(
-                          'Código de Sala',
-                          style: AppTypography.body1.copyWith(
-                            color: AppColors.inkMuted,
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            'Código de Sala',
+                            style: AppTypography.body1.copyWith(
+                              color: AppColors.inkMuted,
+                            ),
                           ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
@@ -273,6 +273,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                           children: [
                             Text(
                               room.code,
+                              semanticsLabel: room.code.split('').join(' '),
                               style:
                                   AppTypography.tabular(
                                     AppTypography.display,
@@ -283,6 +284,13 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                                   ),
                             ),
                             IconButton(
+                              // The label tracks the state: after copying,
+                              // the icon swaps to a check, and a screen
+                              // reader that re-reads the control would
+                              // otherwise still be told "copiar".
+                              tooltip: _codeCopied
+                                  ? 'Código copiado'
+                                  : 'Copiar código de sala',
                               // Capítulo 18: copying the room code fires an
                               // icon Swap to a check, "nunca solo un Snackbar
                               // silencioso" — before Fase 2A the only visual
@@ -298,7 +306,6 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                                       : AppColors.ink,
                                 ),
                               ),
-                              tooltip: 'Copiar código de sala',
                               onPressed: () => _copyRoomCode(room.code),
                             ),
                           ],

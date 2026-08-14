@@ -261,10 +261,13 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
-                  Text(
-                    '¿Cuál es la respuesta más chistosa?',
-                    style: AppTypography.h2.copyWith(color: AppColors.paper),
-                    textAlign: TextAlign.center,
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      '¿Cuál es la respuesta más chistosa?',
+                      style: AppTypography.h2.copyWith(color: AppColors.paper),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Container(
@@ -357,28 +360,50 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
                     ),
                     child: Column(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              hasVoted ? Icons.check_circle : Icons.touch_app,
-                              color: hasVoted
-                                  ? AppColors.mint
-                                  : AppColors.paper.withValues(alpha: 0.72),
-                              size: 20,
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(
-                              hasVoted
-                                  ? '¡Voto enviado!'
-                                  : 'Toca una respuesta para votar',
-                              style: AppTypography.body1.copyWith(
+                        // The confirmation lands in place, and it is carried
+                        // visually by a colour swap plus an icon swap — so
+                        // without this a screen reader is never told the vote
+                        // registered. `liveRegion` is tied to `hasVoted`
+                        // because the flip happens once per player per round;
+                        // the "toca para votar" prompt must not be announced.
+                        Semantics(
+                          liveRegion: hasVoted,
+                          label: hasVoted
+                              ? '¡Voto enviado!'
+                              : 'Toca una respuesta para votar',
+                          excludeSemantics: true,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                hasVoted ? Icons.check_circle : Icons.touch_app,
                                 color: hasVoted
                                     ? AppColors.mint
                                     : AppColors.paper.withValues(alpha: 0.72),
+                                size: 20,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: AppSpacing.xs),
+                              // Flexible, not bare: the un-voted prompt is the
+                              // longest string in this Row, and beside a
+                              // fixed 20 px icon it overruns the card on a
+                              // narrow phone once the text scale climbs.
+                              Flexible(
+                                child: Text(
+                                  hasVoted
+                                      ? '¡Voto enviado!'
+                                      : 'Toca una respuesta para votar',
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.body1.copyWith(
+                                    color: hasVoted
+                                        ? AppColors.mint
+                                        : AppColors.paper.withValues(
+                                            alpha: 0.72,
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         LinearProgressIndicator(

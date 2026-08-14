@@ -125,6 +125,29 @@ class MyApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
+      // Fase 2B WP4: the accessibility floor's text-scaling band.
+      //
+      // Capítulo 28 asks for 150–200% text support, and before this the app
+      // had zero `textScaler` handling of any kind: the system scale passed
+      // straight through to compositions with fixed geometry (the 80 pt
+      // profile emoji, the 100/120 px leaderboard podium, the timer arc), and
+      // `TYPOGRAPHY_AUDIT.md` §7 predicts a hard overflow rather than a
+      // cramped layout.
+      //
+      // The band is the blueprint's own compromise, not a new policy: clamp to
+      // 1.4 so the direction of the user's preference is always honoured and
+      // the game loop never breaks, in preference to an unbounded aspiration
+      // that overflows. It is deliberately *global* — a per-screen scaler
+      // would have to be re-argued on every screen added.
+      //
+      // The floor is 1.0: shrinking type below the design scale is not an
+      // accessibility win, and the Butter Bliss scale is already at its
+      // legible minimum at 12 pt.
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        minScaleFactor: 1.0,
+        maxScaleFactor: 1.4,
+        child: child!,
+      ),
       home: const HomeScreen(),
     );
   }
