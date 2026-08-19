@@ -131,7 +131,7 @@ was not reached. A FAIL must name the control and what was announced.
 | V7 | Prompt while un-voted | "Toca una respuesta para votar" readable, **never announced spontaneously** | NOT TESTED | NOT TESTED |
 | V8 | **"¡Voto enviado!"** | announced **once**, when the vote registers | NOT TESTED | NOT TESTED |
 | V9 | Vote progress bar | percentage reachable; does not announce per vote | NOT TESTED | NOT TESTED |
-| V10 | 1.4× | ⚠️ **Known limitation** — see `WP4_ACCESSIBILITY_REPORT.md` §10.1. Record what actually happens on device; this is the measurement that decides how urgent the fix is | NOT TESTED | NOT TESTED |
+| V10 | 1.4× | Fixed in WP5 (content scrolls; status block and CTA stay pinned). Confirm on device that the status block never scrolls away | NOT TESTED | NOT TESTED |
 
 ---
 
@@ -150,7 +150,7 @@ was not reached. A FAIL must name the control and what was announced.
 | R7 | Non-host waiting state | conveyed as text | NOT TESTED | NOT TESTED |
 | R8 | Reduced motion | reveal still completes and still announces R2 | NOT TESTED | NOT TESTED |
 | R9 | Confetti | silent — must not appear in the semantics tree | NOT TESTED | NOT TESTED |
-| R10 | 1.4× | ⚠️ **Known limitation** — see §10.1. Record device behaviour | NOT TESTED | NOT TESTED |
+| R10 | 1.4× | Fixed in WP5 (spotlight and scoreboard scroll together; CTA stays pinned). Confirm the CTA is reachable without scrolling | NOT TESTED | NOT TESTED |
 
 ---
 

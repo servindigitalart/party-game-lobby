@@ -255,92 +255,125 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  GameProgressBar(
-                    currentRound: room.currentRound,
-                    totalRounds: room.totalRounds,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      '¿Cuál es la respuesta más chistosa?',
-                      style: AppTypography.h2.copyWith(color: AppColors.paper),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: AppColors.lavender.withValues(alpha: 0.12),
-                      borderRadius: AppShapes.borderRadiusMd,
-                      border: AppShapes.hairlineBorder(
-                        AppColors.lavender.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    child: Text(
-                      room.currentQuestionText ?? '',
-                      style: AppTypography.body1.copyWith(
-                        color: AppColors.lavender,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  if (_isAdvancing || allVoted) ...[
-                    _VoteTransitionBanner(
-                      title: GameCopy.countingVotes,
-                      subtitle: 'El juicio social ya está cerrado.',
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                  ],
-
+                  // Fase 2B WP5 — the scroll boundary moved outward.
+                  //
+                  // It used to sit on the answer list alone, which made the
+                  // round header, the status block and the CTA all non-flex
+                  // siblings of a tight `Expanded`. Once the header grew with
+                  // the text scale, `freeSpace` went negative, the `Expanded`
+                  // was allotted a negative extent and this Column overflowed
+                  // (267 px at 1.4x on a 360x800 phone).
+                  //
+                  // The question and the answers are one region of content, so
+                  // they now scroll together inside the `Expanded`. The status
+                  // block and the CTA stay outside it: they are live chrome,
+                  // and the vote confirmation must never scroll out of view.
+                  //
+                  // At 1.0x with content that fits, the scroll view is inert
+                  // and every element lands exactly where it did before.
                   Expanded(
-                    child: ListView.separated(
-                      itemCount: shuffledPlayers.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppSpacing.sm),
-                      itemBuilder: (context, index) {
-                        final player = shuffledPlayers[index];
-                        final isSelected = currentPlayer.votedFor == player.id;
-                        final canVote = !hasVoted && player.id != userId;
-
-                        return TweenAnimationBuilder<double>(
-                          duration: Duration(milliseconds: 200 + (index * 50)),
-                          tween: Tween(begin: 0.0, end: 1.0),
-                          curve: Curves.easeOut,
-                          builder: (context, value, child) {
-                            return Opacity(
-                              opacity: value,
-                              child: Transform.translate(
-                                offset: Offset(20 * (1 - value), 0),
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: GameCard(
-                            text: player.currentAnswer ?? 'Sin respuesta',
-                            isSelected: isSelected,
-                            isDisabled: !canVote,
-                            semanticLabel: player.id == userId
-                                ? 'Tu respuesta: ${player.currentAnswer ?? "sin respuesta"}. '
-                                      'No puedes votar por ti mismo.'
-                                : null,
-                            onTap: canVote
-                                ? () => _vote(
-                                    context,
-                                    ref,
-                                    room.code,
-                                    currentPlayer.id,
-                                    player.id,
-                                  )
-                                : null,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          GameProgressBar(
+                            currentRound: room.currentRound,
+                            totalRounds: room.totalRounds,
                           ),
-                        );
-                      },
+                          const SizedBox(height: AppSpacing.lg),
+
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              '¿Cuál es la respuesta más chistosa?',
+                              style: AppTypography.h2.copyWith(
+                                color: AppColors.paper,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            decoration: BoxDecoration(
+                              color: AppColors.lavender.withValues(alpha: 0.12),
+                              borderRadius: AppShapes.borderRadiusMd,
+                              border: AppShapes.hairlineBorder(
+                                AppColors.lavender.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Text(
+                              room.currentQuestionText ?? '',
+                              style: AppTypography.body1.copyWith(
+                                color: AppColors.lavender,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+
+                          if (_isAdvancing || allVoted) ...[
+                            _VoteTransitionBanner(
+                              title: GameCopy.countingVotes,
+                              subtitle: 'El juicio social ya está cerrado.',
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                          ],
+
+                          // Part of the page scroll now, not its own scrollable.
+                          // Bounded by the answer cap (8 players), so shrink-
+                          // wrapping costs nothing.
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: shuffledPlayers.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: AppSpacing.sm),
+                            itemBuilder: (context, index) {
+                              final player = shuffledPlayers[index];
+                              final isSelected =
+                                  currentPlayer.votedFor == player.id;
+                              final canVote = !hasVoted && player.id != userId;
+
+                              return TweenAnimationBuilder<double>(
+                                duration: Duration(
+                                  milliseconds: 200 + (index * 50),
+                                ),
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                curve: Curves.easeOut,
+                                builder: (context, value, child) {
+                                  return Opacity(
+                                    opacity: value,
+                                    child: Transform.translate(
+                                      offset: Offset(20 * (1 - value), 0),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: GameCard(
+                                  text: player.currentAnswer ?? 'Sin respuesta',
+                                  isSelected: isSelected,
+                                  isDisabled: !canVote,
+                                  semanticLabel: player.id == userId
+                                      ? 'Tu respuesta: ${player.currentAnswer ?? "sin respuesta"}. '
+                                            'No puedes votar por ti mismo.'
+                                      : null,
+                                  onTap: canVote
+                                      ? () => _vote(
+                                          context,
+                                          ref,
+                                          room.code,
+                                          currentPlayer.id,
+                                          player.id,
+                                        )
+                                      : null,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),

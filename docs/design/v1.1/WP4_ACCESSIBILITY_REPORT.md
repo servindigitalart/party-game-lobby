@@ -11,6 +11,11 @@
 > no bypasses, and verified; but two loop screens still overflow vertically at the top of the band
 > and the fix requires layout restructuring that is out of WP4's scope. See §4 and §10.1.
 >
+> **Superseded 2026-08-13 — WP5 resolved §10.1.** Both overflows are fixed and covered by 29 tests;
+> see `WP5_LARGE_TEXT_LAYOUT_REPORT.md`. WP5 also corrected this report's characterisation of the
+> defect: Round Result overflowed at **1.0×** with a full room, not only at maximum text scale.
+> AC2's class-B gap is closed. The sections below are left as written, marked where superseded.
+>
 > The manual VoiceOver/TalkBack pass is **NOT TESTED** — no Android or iOS device or emulator was
 > available (`flutter devices` reports only macOS desktop and Chrome). It was not simulated. The
 > checklist to run it is `WP4_MANUAL_ACCESSIBILITY_CHECKLIST.md`.
@@ -329,7 +334,17 @@ is the largest gap in this report's evidence.
 
 ## 10. Remaining Known Issues
 
-### 10.1 Vertical overflow at maximum text scale on two loop screens — **KNOWN LIMITATION / DEFERRED TO FUTURE WP**
+### 10.1 Vertical overflow at maximum text scale on two loop screens — **RESOLVED BY WP5 (2026-08-13)**
+
+> **Resolved.** `WP5_LARGE_TEXT_LAYOUT_REPORT.md` fixed both screens by moving the scroll boundary
+> around the content while keeping the status block and CTA pinned outside it. 29 regression tests
+> cover {Voting, Round Result} × {360×800, 390×844} × {1.0×, 1.2×, 1.4×}.
+>
+> Two corrections to the analysis below, both established by measurement rather than reasoning:
+> **(a)** Round Result overflowed at **1.0×** with a full eight-player room — an everyday defect,
+> not a maximum-scale one; **(b)** the `Flexible(loose)` rejection was right, and WP5 proved it with
+> a probe: 150 px of dead space in a 500 px column. The rest of this section stands as the record of
+> why the fix took the shape it did.
 
 **Symptom.** At the top of the band (1.4×) on a 360×800 surface, `voting_screen` overflows at the
 bottom by ≈2459 px and `round_result_screen` by ≈1346 px.
@@ -467,7 +482,7 @@ needs to stay visible at each call site. Recorded as a candidate, not built.
 | Criterion | Status | Evidence |
 |---|---|---|
 | **AC1 — Semantics: every screen has an explicit strategy** (main heading, identifiable actions, identifiable icon-only controls, communicable states, nothing colour-only) | **MET** — implemented + verified automatically | Final census: **11/11** screens carry a `Semantics` strategy, up from 7/11. Headings on 8 screens; composite labels on leaderboard, season, profile, paywall, title dialog; 5 colour-only states now announced (§3). `AppBar`/`Tab` correctly left to Flutter. Verified by semantics dumps and 17 tests. Per-control wording still **MANUAL TEST REQUIRED**. |
-| **AC2 — Text scaling: a real strategy, verified with large text** | **PARTIAL** | *Infrastructure (class A): complete.* Global band `MediaQuery.withClampedTextScaling(1.0, 1.4)` in `MaterialApp.builder`, policy taken verbatim from `TYPOGRAPHY_AUDIT.md` §7; census confirms **0 local overrides**, so nothing bypasses it. Clamp value, non-inflating floor and home-at-max-scale all verified by test; 3 horizontal overflows found and fixed. *Layout (class B): 2 open.* `voting_screen` and `round_result_screen` overflow vertically at 1.4× on a short viewport — **KNOWN LIMITATION**, cause and rejected fixes documented, **DEFERRED TO a future layout WP** (§4.0, §10.1). |
+| **AC2 — Text scaling: a real strategy, verified with large text** | **PARTIAL** | *Infrastructure (class A): complete.* Global band `MediaQuery.withClampedTextScaling(1.0, 1.4)` in `MaterialApp.builder`, policy taken verbatim from `TYPOGRAPHY_AUDIT.md` §7; census confirms **0 local overrides**, so nothing bypasses it. Clamp value, non-inflating floor and home-at-max-scale all verified by test; 3 horizontal overflows found and fixed. *Layout (class B): closed by WP5.* `voting_screen` and `round_result_screen` overflowed vertically — the reveal already at 1.0× with a full room — and were **RESOLVED** in `WP5_LARGE_TEXT_LAYOUT_REPORT.md` (§4.0, §10.1). **As of WP5 this criterion is MET**; it is left as PARTIAL here to preserve the record of WP4's own scope. |
 | **AC3 — Icon-only controls identifiable; no duplicate tooltips** | **MET** — implemented + verified automatically | Final census: **1:1** `IconButton`-to-`tooltip` in all six files, zero duplicates; the duplicate that broke the build is gone (§2). All six `InkWell`/`GestureDetector` action controls describe their action (§6). Announced wording **MANUAL TEST REQUIRED**. |
 | **AC4 — Dynamic state communicable without spam** | **MET** — implemented + verified automatically | 3 new live regions + the pre-existing timer's 30/10/5 s pattern, untouched. Tests assert both presence *and* absence — pending prompts, pending answer progress and the pre-stage-2 reveal are all verified silent (§5, §8). Real-world announcement cadence **MANUAL TEST REQUIRED** (checklist A5, A10, V7). |
 | **AC5 — Reduced motion not broken** | **MET** — verified automatically | `reduced_motion.dart` untouched (`git diff` on it is empty) and all five call sites intact; new test renders the loop with `disableAnimations: true`; existing reduced-motion tests still pass (§7). |
@@ -485,7 +500,7 @@ reader, which was not true at any point before this work.
 
 What remains, in priority order:
 
-1. **KNOWN LIMITATION / DEFERRED** — max-scale vertical overflow on `voting_screen` and
+1. ~~**KNOWN LIMITATION / DEFERRED**~~ — **RESOLVED BY WP5.** Max-scale vertical overflow on `voting_screen` and
    `round_result_screen` (§10.1). Needs a layout decision, not more semantics. Belongs to a future
    loop-layout WP.
 2. **MANUAL TEST REQUIRED** — the VoiceOver/TalkBack pass (§10.3). No automated evidence substitutes

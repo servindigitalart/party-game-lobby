@@ -269,62 +269,85 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TweenAnimationBuilder<double>(
-                      duration: const Duration(milliseconds: 650),
-                      tween: Tween(begin: 0.0, end: 1.0),
-                      curve: Curves.easeOutBack,
-                      builder: (context, value, child) {
-                        return Opacity(
-                          opacity: value.clamp(0.0, 1.0),
-                          child: Transform.scale(
-                            scale: 0.92 + (value * 0.08),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: _WinnerSpotlight(
-                        winnerName: winner.name,
-                        answer: winningAnswer,
-                        votesReceived: votesReceived,
-                        revealStage: _revealStage,
-                        keyholeProgress: _keyholeProgress,
+                    // Fase 2B WP5 — the scroll boundary moved outward.
+                    //
+                    // The spotlight is the most text-scale-sensitive block in
+                    // the app (a display-size name over a multi-line answer),
+                    // and it sat as a non-flex sibling of a tight flex child:
+                    // `Expanded(_NightScoreboard)` after stage 2, `Spacer()`
+                    // before it. Once the spotlight outgrew the space left
+                    // over, that child was allotted a negative extent and this
+                    // Column overflowed — at 1.0x already, with a full
+                    // eight-player room.
+                    //
+                    // Spotlight and scoreboard are one region of content, so
+                    // they scroll together inside the `Expanded`. The CTA
+                    // stays outside it and stays reachable.
+                    //
+                    // The `Spacer` that used to hold the button at the bottom
+                    // before stage 2 is gone: this `Expanded` does that job in
+                    // both stages, which is what the Spacer's comment asked
+                    // for, and it cannot go negative.
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TweenAnimationBuilder<double>(
+                              duration: const Duration(milliseconds: 650),
+                              tween: Tween(begin: 0.0, end: 1.0),
+                              curve: Curves.easeOutBack,
+                              builder: (context, value, child) {
+                                return Opacity(
+                                  opacity: value.clamp(0.0, 1.0),
+                                  child: Transform.scale(
+                                    scale: 0.92 + (value * 0.08),
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: _WinnerSpotlight(
+                                winnerName: winner.name,
+                                answer: winningAnswer,
+                                votesReceived: votesReceived,
+                                revealStage: _revealStage,
+                                keyholeProgress: _keyholeProgress,
+                              ),
+                            ),
+
+                            // THE GATE. The scoreboard's `#1` row identifies the
+                            // winner, so rendering it from stage 0 — as this screen
+                            // did until Fase 2A — let a player read the answer off
+                            // the bottom of the screen during the 800 ms of
+                            // engineered suspense above it. Capítulo 35 Fase 3F's
+                            // acceptance criterion is explicit: "el scoreboard no es
+                            // visible hasta que termina la etapa 2 del reveal."
+                            //
+                            // Not built at all before stage 2, rather than hidden
+                            // with opacity: an invisible widget is still in the
+                            // semantics tree, so a screen-reader user would have had
+                            // the reveal spoiled by a fix that looked correct.
+                            if (_revealStage >= 2) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  'Marcador de la noche',
+                                  style: AppTypography.h4.copyWith(
+                                    color: phase.onSurface,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              _NightScoreboard(
+                                players: sortedPlayers,
+                                voteCounts: voteCounts,
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
-
-                    // THE GATE. The scoreboard's `#1` row identifies the
-                    // winner, so rendering it from stage 0 — as this screen
-                    // did until Fase 2A — let a player read the answer off
-                    // the bottom of the screen during the 800 ms of
-                    // engineered suspense above it. Capítulo 35 Fase 3F's
-                    // acceptance criterion is explicit: "el scoreboard no es
-                    // visible hasta que termina la etapa 2 del reveal."
-                    //
-                    // Not built at all before stage 2, rather than hidden
-                    // with opacity: an invisible widget is still in the
-                    // semantics tree, so a screen-reader user would have had
-                    // the reveal spoiled by a fix that looked correct.
-                    if (_revealStage >= 2) ...[
-                      const SizedBox(height: AppSpacing.lg),
-                      Semantics(
-                        header: true,
-                        child: Text(
-                          'Marcador de la noche',
-                          style: AppTypography.h4.copyWith(
-                            color: phase.onSurface,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Expanded(
-                        child: _NightScoreboard(
-                          players: sortedPlayers,
-                          voteCounts: voteCounts,
-                        ),
-                      ),
-                    ] else
-                      // Holds the button at the bottom so the spotlight does
-                      // not jump when the scoreboard arrives.
-                      const Spacer(),
                     const SizedBox(height: AppSpacing.md),
                     if (isHost)
                       AnimatedPrimaryButton(
@@ -391,7 +414,13 @@ class _NightScoreboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final phase = context.phase;
 
+    // Fase 2B WP5: part of the screen's page scroll now rather than its own
+    // scrollable, so the spotlight above it can grow with the text scale
+    // instead of squeezing this list to a negative height. Bounded by the
+    // eight-player room cap, so shrink-wrapping costs nothing.
     final list = ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: players.length,
       itemBuilder: (context, index) {
         final player = players[index];
