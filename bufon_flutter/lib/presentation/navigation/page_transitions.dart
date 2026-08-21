@@ -79,12 +79,12 @@ extension NavigationExtensions on BuildContext {
     ).pushReplacement<T, void>(FadeSlidePageRoute(page: page));
   }
 
-  /// Push and remove all previous routes
-  Future<T?> pushAndRemoveAllFadeSlide<T>(Widget page) {
-    return Navigator.of(
-      this,
-    ).pushAndRemoveUntil<T>(FadeSlidePageRoute(page: page), (route) => false);
-  }
+  // There is no forward whole-stack push. `pushAndRemoveAllFadeSlide` used to
+  // sit here and was, until Fase 2B WP6, what every exit actually called —
+  // which is why leaving a room animated exactly like advancing a round.
+  // Clearing the entire stack only ever happens on the way back to Home, and
+  // that is a retreat by definition, so the forward variant had no legitimate
+  // case left once [pushAndRemoveAllFade] was adopted.
 
   /// Replace with a retreat transition (fade only) — see [FadePageRoute].
   Future<T?> replaceFade<T>(Widget page) {

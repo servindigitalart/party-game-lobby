@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launch-window colours. These are the only two colours Android needs to know
+  about, and both are measured from what the app itself renders rather than
+  invented here.
+-->
+<resources>
+    <!--
+      The exact background baked into `splash_isotype.png`, sampled from the
+      asset's own edge pixels in all five density buckets (dominant value in
+      every one). Deliberately NOT AppColors.butter (#F8EE67): the splash mark
+      is an opaque square, so what makes its edge invisible against the rest of
+      the window is matching the *asset*, not the design token it was exported
+      from.
+    -->
+    <color name="bufon_splash">#F9F367</color>
+
+    <!--
+      AppColors.paper — the first colour Flutter actually paints. `main.dart`
+      pins the app to `ThemeMode.light`, Home declares `BufonPhase.home`, and
+      that register's surface is Paper. The window sitting on this means the
+      handoff from the Android window to the first Flutter frame is a no-op.
+    -->
+    <color name="bufon_surface">#FAFAF7</color>
+</resources>

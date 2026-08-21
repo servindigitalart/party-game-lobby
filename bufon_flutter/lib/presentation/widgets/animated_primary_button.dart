@@ -19,7 +19,8 @@ import '../../services/sound_service.dart';
 ///   still reachable through [variant] for the one ceremonial moment that
 ///   earned it (Capítulo 8, capa Ceremonial).
 /// - **Pill shape** (Capítulo 9): the primary button echoes the logotype's
-///   letterforms. `AppShapes.pill` existed and had zero call sites.
+///   letterforms, via `AppShapes.borderRadiusFull` — this draws itself with a
+///   `BoxDecoration`, so it needs a `BorderRadius`, not a `ShapeBorder`.
 /// - **Phase-aware defaults**: with no explicit colour it now takes the
 ///   screen's register accent instead of the legacy casino red, so an
 ///   unparameterised instance can no longer render red-on-Paper.

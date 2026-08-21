@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
+<!--
+  Bufón's launch window: the brand's butter ground with the jester centred on
+  it. `splash_isotype` ships in all five density buckets and its own background
+  is this exact colour, so the bitmap's edge is invisible against the fill.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
-
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
+    <item android:drawable="@color/bufon_splash" />
+    <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+            android:src="@drawable/splash_isotype" />
+    </item>
 </layer-list>

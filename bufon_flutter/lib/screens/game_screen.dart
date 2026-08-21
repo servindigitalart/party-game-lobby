@@ -61,7 +61,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
     ref.read(roomCodeProvider.notifier).state = null;
 
-    context.pushAndRemoveAllFadeSlide(const HomeScreen());
+    // Leaving the room is a retreat (Capítulo 23) — the player is being put
+    // back out of the game, not moved forward through it.
+    context.pushAndRemoveAllFade(const HomeScreen());
 
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
@@ -536,10 +538,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           // do nothing with a Firestore error string.
           actionLabel: 'Volver al Inicio',
           onAction: () {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const HomeScreen()),
-              (route) => false,
-            );
+            // Same retreat as every other way out of a room. This was the
+            // one exit still on a raw `MaterialPageRoute`, so abandoning a
+            // lost room animated with the platform default instead of with
+            // Bufón's own motion at all.
+            context.pushAndRemoveAllFade(const HomeScreen());
           },
         ),
       ),

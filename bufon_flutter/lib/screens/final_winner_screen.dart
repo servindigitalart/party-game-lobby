@@ -383,7 +383,10 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
 
   void _exitToHome() {
     HapticService.lightImpact();
-    context.pushAndRemoveAllFadeSlide(const HomeScreen());
+    // A retreat, not an advance (Capítulo 23). The night is over: this is the
+    // player stepping out of the experience, so it fades rather than sliding
+    // forward the way advancing a round does.
+    context.pushAndRemoveAllFade(const HomeScreen());
   }
 }
 

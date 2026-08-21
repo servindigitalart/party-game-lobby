@@ -101,28 +101,16 @@ class MotionScale {
   static const double arriveFrom = 0.88; // punto de partida de un Arrive
 }
 
-/// Named `SpringDescription` presets for widgets that want a real physics
-/// simulation (`SpringSimulation`) instead of a `Tween`+`Curve` — useful for
-/// gesture-driven interactions (e.g. a draggable card) where the animation
-/// needs to react to velocity, which curves can't express. Unused until a
-/// future widget opts in.
-class MotionSprings {
-  MotionSprings._();
-
-  /// Compressing under touch — stiff and fast, minimal bounce.
-  static const SpringDescription press = SpringDescription(
-    mass: 1,
-    stiffness: 500,
-    damping: 26,
-  );
-
-  /// Releasing after a confirmed action — looser, allows visible overshoot.
-  static const SpringDescription release = SpringDescription(
-    mass: 1,
-    stiffness: 180,
-    damping: 12,
-  );
-}
+// `MotionSprings` (two `SpringDescription` presets, `press` and `release`)
+// lived here with zero call sites. Its own doc named the case it was for —
+// "gesture-driven interactions (e.g. a draggable card) where the animation
+// needs to react to velocity" — and Bufón has no such interaction anywhere:
+// no `Draggable`, no `Dismissible`, no pan handler, no `SpringSimulation`.
+// Every animation in the app is a declarative `Tween`+`Curve` over a known
+// duration, which is the correct mechanism for motion that is not reacting to
+// a finger. Adopting the springs would have meant inventing a gesture to
+// justify them. Removed; re-add from this history if a draggable surface is
+// ever designed, at which point the values are one commit away.
 
 /// Standalone physical constants from `BRAND PHYSICS` that aren't a
 /// duration, curve, scale factor or spring on their own, but govern how

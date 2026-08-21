@@ -74,8 +74,14 @@ flutter:
     # Real brand marks (Capítulo 2). Until Fase 2A these lived in /public —
     # the leftover Create React App web root — so the shipped app contained
     # no pixels of its own identity.
+    #
+    # `wordmark.png` is deliberately NOT bundled (Fase 2B WP6). It shipped in
+    # every install for ~96 KB and rendered nowhere, and it cannot be adopted
+    # yet: it reads BUFON while every string in the app reads BUFÓN, a naming
+    # decision BUFON_V1.1_VISUAL_BLUEPRINT.md §556 reserves for the owner and
+    # which blocks its own adoption item (I5). The file stays in the repo as
+    # brand source; add the line back when the accent question is answered.
     - assets/brand/isotype.png
-    - assets/brand/wordmark.png
 
   fonts:
     # Bundled, not runtime-fetched. Latin subset (verified to cover every

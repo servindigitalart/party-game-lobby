@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12+ (API 31) draws the launch screen itself through the platform
+      SplashScreen API and ignores `windowBackground`, so the branded launch has
+      to be declared again in its own vocabulary or these devices fall back to
+      the system default.
+
+      The icon has to be declared too, and this is the part that took two
+      attempts. Left to itself, the platform centres `@mipmap/ic_launcher` —
+      legacy square bitmaps, no `mipmap-anydpi-v26` adaptive icon — and applies
+      its legacy-icon treatment, which bakes a white circular backdrop into the
+      icon drawable and shrinks the mark inside it. On Bufón's butter field that
+      read as a white ring around a butter square around a tiny jester.
+
+      `windowSplashScreenIconBackgroundColor` does NOT fix that, and was
+      measured proving it: the baked white circle paints *over* the theme's
+      icon-background colour, so the attribute is completely inert here. Do not
+      re-add it.
+
+      Naming `splash_isotype` as the splash icon does fix it. The platform fits
+      the drawable inside its circular mask, and because the asset's own
+      background is this same butter the mask boundary is invisible: the mark
+      lands on an unbroken butter field. The square is 128 dp in all five
+      density buckets and the mark occupies its middle ~60%, so nothing is
+      clipped — verified, not assumed (silhouette agreement with the source
+      asset 98.25%, aspect ratio 1.1237 vs 1.1247).
+
+      Measured on Medium_Phone_API_36.0 (API 36, density 420), light and dark,
+      across cold launches: white pixels 172 -> 0, mark 46x51 dp -> 159x179 dp.
+      See WP6_FINAL_VERIFICATION_REPORT.md §17.
+    -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@color/bufon_splash</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_isotype</item>
+    </style>
+
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@color/bufon_surface</item>
+    </style>
+</resources>

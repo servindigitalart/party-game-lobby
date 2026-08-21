@@ -69,8 +69,14 @@ class AppShapes {
   // RoundedRectangleBorder/BorderRadius ad hoc in a widget.
   // ---------------------------------------------------------------------
 
-  /// Pill (radio completo) — botones primarios, chips, tags de estado.
-  static const ShapeBorder pill = StadiumBorder();
+  // `pill` (a `StadiumBorder`) lived here and had zero call sites for its
+  // whole life. The two surfaces that genuinely *are* pills — the primary
+  // button and the round-progress chip — both draw themselves with a
+  // `BoxDecoration`, which takes a `BorderRadius`, not a `ShapeBorder`; they
+  // use [borderRadiusFull] and always did. Converting either to a
+  // `ShapeDecoration` purely so a token could claim a call site is added
+  // complexity in service of a token, so the token is gone instead.
+  // [borderRadiusFull] is the pill in this codebase.
 
   /// Tarjeta de contenido estándar — modales/pantalla completa usan [heroCard].
   static RoundedRectangleBorder card({Color? borderColor}) =>
