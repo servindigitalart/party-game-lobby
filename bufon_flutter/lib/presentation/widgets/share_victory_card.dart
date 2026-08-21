@@ -85,145 +85,171 @@ class ShareVictoryCard extends StatelessWidget {
               ),
             ),
 
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(40.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 40),
+            // Content.
+            //
+            // WP7: this used to be a `Padding` holding a `Column` with a
+            // `Spacer`, sized by the 600x800 frame. Its fixed children need
+            // 1190 px inside a 720 px content box, so `freeSpace` went
+            // negative, the `Spacer` was allotted nothing, and the column
+            // overflowed by 470 px — the exact 470 px the exported PNG has
+            // always been missing, because the capture is taken at the frame's
+            // declared size. Every victory card ever shared lost its stats
+            // block, its message and its watermark.
+            //
+            // The composition is now laid out at its own natural height and
+            // scaled uniformly into the frame. Nothing is reflowed, resized
+            // relative to anything else, or dropped: the card renders exactly
+            // the composition it was authored as, the way exporting a design
+            // at a smaller size would. The frame — and therefore the export's
+            // 3:4 aspect — is unchanged.
+            Positioned.fill(
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: SizedBox(
+                  // The width the composition was authored against: the frame
+                  // minus the padding it used to carry.
+                  width: 520,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 40),
 
-                  // Crown emoji
-                  const Text('👑', style: TextStyle(fontSize: 80)),
-                  const SizedBox(height: 20),
+                      // Crown emoji
+                      const Text('👑', style: TextStyle(fontSize: 80)),
+                      const SizedBox(height: 20),
 
-                  // Title
-                  Text(
-                    'BUFÓN DE LA NOCHE',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.gold,
-                      letterSpacing: 4,
-                      shadows: [
-                        Shadow(
-                          color: AppColors.gold.withValues(alpha: 0.5),
-                          blurRadius: 20,
+                      // Title
+                      Text(
+                        'BUFÓN DE LA NOCHE',
+                        style: TextStyle(
+                          fontSize: 48,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.gold,
+                          letterSpacing: 4,
+                          shadows: [
+                            Shadow(
+                              color: AppColors.gold.withValues(alpha: 0.5),
+                              blurRadius: 20,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 60),
-
-                  // Avatar
-                  Container(
-                    width: 220,
-                    height: 220,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [AppColors.gold, AppColors.amber],
+                        textAlign: TextAlign.center,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.gold.withValues(alpha: 0.6),
-                          blurRadius: 50,
-                          spreadRadius: 15,
+                      const SizedBox(height: 60),
+
+                      // Avatar
+                      Container(
+                        width: 220,
+                        height: 220,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [AppColors.gold, AppColors.amber],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.gold.withValues(alpha: 0.6),
+                              blurRadius: 50,
+                              spreadRadius: 15,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        avatar.emoji,
-                        style: const TextStyle(fontSize: 120),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Player name
-                  Text(
-                    playerName,
-                    style: const TextStyle(
-                      fontSize: 42,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 50),
-
-                  // Stats
-                  Container(
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppColors.gold.withValues(alpha: 0.5),
-                        width: 2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _buildStatColumn(
-                          '❤️',
-                          '$votesReceived',
-                          'Votos',
-                          AppColors.primary,
+                        child: Center(
+                          child: Text(
+                            avatar.emoji,
+                            style: const TextStyle(fontSize: 120),
+                          ),
                         ),
-                        Container(
-                          width: 2,
-                          height: 80,
-                          color: AppColors.border,
-                        ),
-                        _buildStatColumn(
-                          '🏆',
-                          '$roundWins',
-                          'Rondas',
-                          AppColors.gold,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  // Message
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundCard,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Text(
-                      '🎭 Maestro del caos y rey del drama 🎭',
-                      style: TextStyle(
-                        fontSize: 22,
-                        color: AppColors.textSecondary,
-                        fontStyle: FontStyle.italic,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
+                      const SizedBox(height: 40),
 
-                  // Watermark
-                  Opacity(
-                    opacity: 0.6,
-                    child: Text(
-                      'BUFÓN',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.gold,
-                        letterSpacing: 3,
+                      // Player name
+                      Text(
+                        playerName,
+                        style: const TextStyle(
+                          fontSize: 42,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
+                      const SizedBox(height: 50),
+
+                      // Stats
+                      Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface.withValues(alpha: 0.8),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppColors.gold.withValues(alpha: 0.5),
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildStatColumn(
+                              '❤️',
+                              '$votesReceived',
+                              'Votos',
+                              AppColors.primary,
+                            ),
+                            Container(
+                              width: 2,
+                              height: 80,
+                              color: AppColors.border,
+                            ),
+                            _buildStatColumn(
+                              '🏆',
+                              '$roundWins',
+                              'Rondas',
+                              AppColors.gold,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Was a `Spacer`, which needs a bounded column and had
+                      // no free space to claim in any case.
+                      const SizedBox(height: 40),
+
+                      // Message
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundCard,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Text(
+                          '🎭 Maestro del caos y rey del drama 🎭',
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: AppColors.textSecondary,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+
+                      // Watermark
+                      Opacity(
+                        opacity: 0.6,
+                        child: Text(
+                          'BUFÓN',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.gold,
+                            letterSpacing: 3,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ],

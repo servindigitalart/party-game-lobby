@@ -72,28 +72,25 @@ void main() {
   /// Past both ceremony timers, each given its own frame, then consumes the
   /// one exception that is not this WP's.
   ///
-  /// `ShareVictoryCard` is mounted off-screen for every player and declares a
-  /// frame smaller than its own content, so it overflows the moment it is laid
-  /// out — true before WP6 touched anything, and share-card work is explicitly
-  /// out of scope (see WP3_FINAL_WINNER_REPORT.md). Consumed here so a real
-  /// failure in the exit path is not masked by it. Any *other* exception still
-  /// fails the test.
+  /// WP6 consumed one known exception here: `ShareVictoryCard` is mounted
+  /// off-screen for every player and used to overflow its own frame the moment
+  /// it was laid out. WP7 repaired the card, so nothing is consumed any more.
   Future<void> pumpToStandings(WidgetTester tester) async {
     await tester.pump(const Duration(milliseconds: 950));
     await tester.pump(const Duration(milliseconds: 1000));
     await tester.pump(const Duration(milliseconds: 400));
 
-    final pending = tester.takeException();
-    if (pending != null) {
-      expect(
-        pending.toString(),
-        contains('overflowed'),
-        reason: 'unexpected exception thrown by the ceremony itself',
-      );
-    }
+    expect(tester.takeException(), isNull);
   }
 
   Future<void> exitToHome(WidgetTester tester) async {
+    // Scrolled into view rather than assumed on-screen: the ceremony is a
+    // `SingleChildScrollView`, and its action column grew when WP7 ungated
+    // share, so on a 390x844 surface the exit sits just past the fold for a
+    // non-winner. `ensureVisible` is what a player does, and it keeps this
+    // test from tracking the ceremony's height.
+    await tester.ensureVisible(find.text('Salir'));
+    await tester.pump();
     await tester.tap(find.text('Salir'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));

@@ -54,4 +54,18 @@ class GameCopy {
   static const countingVotes = 'Contando votos...';
   static const nextRound = 'Siguiente ronda...';
   static const roundWinnerPrefix = 'El BUFÓN de la ronda es';
+
+  /// The victory card's share text (blueprint G6 / Fase 2B WP7).
+  ///
+  /// The card is shareable by everyone in the room, not just the winner, so the
+  /// text cannot be written in the winner's voice — whoever posts it is either
+  /// claiming the title or reporting someone else's night, and the copy has to
+  /// say which. One entry point rather than a ternary at the call site, so the
+  /// distinction is testable without going through the OS share sheet.
+  static String shareVictory({
+    required bool isWinner,
+    required String winnerName,
+  }) => isWinner
+      ? '¡Soy el Bufón de la Noche! 🏆'
+      : '$winnerName es el Bufón de la Noche. 🏆';
 }

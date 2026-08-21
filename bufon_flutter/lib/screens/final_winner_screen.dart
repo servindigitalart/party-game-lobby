@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../core/game_copy.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_elevation.dart';
 import '../core/theme/app_shapes.dart';
@@ -202,10 +203,7 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
               // Night tier: 90 particles over 4.5 s, against the round
               // winner's 50 over 3 s. Suppressed under reduced motion by
               // ConfettiWidget itself (Capítulo 28) — no second mechanism.
-              ConfettiWidget(
-                isActive: _stage >= 1,
-                tier: ConfettiTier.night,
-              ),
+              ConfettiWidget(isActive: _stage >= 1, tier: ConfettiTier.night),
               SafeArea(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(
@@ -269,20 +267,18 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
   Widget _buildActions() {
     return Column(
       children: [
-        // Share stays gated to the winner. Ungating it is a two-line
-        // presentation change with no backend work (every viewer already
-        // holds the name, votes and score the card renders), but it changes
-        // *who can do what*, so it belongs to the dedicated share work rather
-        // than to a visual pass — see WP3_FINAL_WINNER_REPORT.md.
-        if (widget.isCurrentUserWinner) ...[
-          AnimatedPrimaryButton(
-            text: _isSharing ? 'Generando...' : 'Compartir victoria',
-            onPressed: _isSharing ? null : _shareVictoryCard,
-            icon: Icons.share,
-            isLoading: _isSharing,
-          ),
-          const SizedBox(height: AppSpacing.md),
-        ],
+        // Share is available to everyone in the room (blueprint G6). WP3 left
+        // it winner-only because ungating changes *who can do what*; WP7 is
+        // that work. Presentation-only: every viewer already holds the name,
+        // votes and score the card renders, so nothing new is read. The text
+        // that leaves the app is chosen by status — see [_shareVictoryCard].
+        AnimatedPrimaryButton(
+          text: _isSharing ? 'Generando...' : 'Compartir victoria',
+          onPressed: _isSharing ? null : _shareVictoryCard,
+          icon: Icons.share,
+          isLoading: _isSharing,
+        ),
+        const SizedBox(height: AppSpacing.md),
         // Secondary by construction: outline, not fill, so the ceremony keeps
         // one primary action (Capítulo 3 ley 4).
         AnimatedPrimaryButton(
@@ -338,9 +334,14 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
       );
       await file.writeAsBytes(byteData.buffer.asUint8List());
 
-      await Share.shareXFiles([
-        XFile(file.path),
-      ], text: '¡Soy el Bufón de la Noche! 🏆');
+      // A non-winner must never post the winner's claim.
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: GameCopy.shareVictory(
+          isWinner: widget.isCurrentUserWinner,
+          winnerName: widget.winnerName,
+        ),
+      );
 
       GameTelemetryService.instance.track(
         AppLogCategory.ui,
@@ -462,10 +463,7 @@ class _CeremonialCrest extends StatelessWidget {
                 ),
               ),
               child: Center(
-                child: Text(
-                  avatar.emoji,
-                  style: const TextStyle(fontSize: 84),
-                ),
+                child: Text(avatar.emoji, style: const TextStyle(fontSize: 84)),
               ),
             ),
           ),

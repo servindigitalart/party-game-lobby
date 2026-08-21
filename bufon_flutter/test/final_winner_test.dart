@@ -42,25 +42,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   }
 
-  /// Runs the ceremony out so no ticker or timer outlives the test, and
-  /// consumes the one exception that is not WP3's.
+  /// Runs the ceremony out so no ticker or timer outlives the test.
   ///
-  /// `ShareVictoryCard` declares a `600x800` frame while its own content needs
-  /// roughly 1270 px, so it overflows by 470 px the moment it is mounted —
-  /// independent of screen size, and true before WP3 touched this screen. It
-  /// is consumed here rather than left to fail every test, and reported in
-  /// `WP3_FINAL_WINNER_REPORT.md`; share-card work is a separate package. Any
-  /// *other* exception still fails.
+  /// Until WP7 this consumed one known exception: `ShareVictoryCard` declared a
+  /// `600x800` frame around content that needed far more, so it overflowed the
+  /// moment the ceremony mounted it. WP7 fixed the card, so the suppression is
+  /// gone — **any** exception now fails the test, which is the whole point of
+  /// having repaired it.
   Future<void> drain(WidgetTester tester) async {
     await tester.pump(const Duration(seconds: 6));
-    final error = tester.takeException();
-    if (error != null) {
-      expect(
-        error.toString(),
-        contains('overflowed'),
-        reason: 'unexpected exception thrown by the ceremony itself',
-      );
-    }
+    expect(tester.takeException(), isNull);
   }
 
   testWidgets('declares the ceremonial night-winner register', (tester) async {
@@ -118,9 +109,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 950));
     await tester.pump();
 
-    final confetti = tester.widget<ConfettiWidget>(
-      find.byType(ConfettiWidget),
-    );
+    final confetti = tester.widget<ConfettiWidget>(find.byType(ConfettiWidget));
     expect(confetti.tier, ConfettiTier.night);
     expect(confetti.isActive, isTrue);
 
@@ -146,9 +135,7 @@ void main() {
     await pumpToStandings(tester);
 
     // ConfettiWidget is still mounted and still asked to be active...
-    final confetti = tester.widget<ConfettiWidget>(
-      find.byType(ConfettiWidget),
-    );
+    final confetti = tester.widget<ConfettiWidget>(find.byType(ConfettiWidget));
     expect(confetti.isActive, isTrue);
     expect(confetti.tier, ConfettiTier.night);
     // ...but it paints nothing (Capítulo 28).
@@ -174,8 +161,13 @@ void main() {
     await pumpToStandings(tester);
 
     expect(find.text('Salir'), findsOneWidget);
-    // Share stays gated to the winner (unchanged behaviour, documented).
-    expect(find.text('Compartir victoria'), findsNothing);
+    // WP7 ungated share (blueprint G6): the card is the only artefact that
+    // reaches non-players, and the person most likely to post it is often not
+    // the winner. WP3 asserted `findsNothing` here and recorded the ungate as
+    // WP7's work; the truthfulness of what gets posted is covered by
+    // `GameCopy.shareVictory` in `share_victory_card_test.dart`.
+    expect(find.text('Compartir victoria'), findsOneWidget);
+    expect(find.byType(AnimatedPrimaryButton), findsNWidgets(2));
 
     await drain(tester);
   });
@@ -225,13 +217,6 @@ void main() {
     expect(find.text('Salir'), findsOneWidget);
     expect(find.text('Cómo terminó la noche'), findsOneWidget);
     expect(tester.getSize(find.byType(SingleChildScrollView)).width, 360);
-
-    // NOTE: `tester.takeException()` is deliberately not asserted null here.
-    // `ShareVictoryCard` declares `width: 600, height: 800` while its own
-    // content needs ~1270 px, so it overflows its own frame by 470 px
-    // regardless of screen size or of anything WP3 changed. That is a
-    // pre-existing defect in the share card (see WP3_FINAL_WINNER_REPORT.md
-    // §"Discovered"), and share-card work is out of WP3's scope.
 
     await drain(tester);
   });
