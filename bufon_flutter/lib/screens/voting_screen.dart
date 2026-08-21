@@ -19,6 +19,7 @@ import '../presentation/widgets/game_card.dart';
 import '../presentation/widgets/animated_primary_button.dart';
 import '../presentation/widgets/bufon_loader.dart';
 import '../presentation/widgets/bufon_placeholder.dart';
+import '../presentation/widgets/bufon_status_panel.dart';
 import '../presentation/widgets/game_progress_widgets.dart';
 import '../presentation/navigation/page_transitions.dart';
 import '../services/haptic_service.dart';
@@ -378,91 +379,29 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
 
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: hasVoted
-                          ? AppColors.mint.withValues(alpha: 0.12)
-                          : AppColors.graphitePlus1,
-                      borderRadius: AppShapes.borderRadiusMd,
-                      border: AppShapes.hairlineBorder(
-                        hasVoted
-                            ? AppColors.mint.withValues(alpha: 0.35)
-                            : AppColors.graphitePlus1,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        // The confirmation lands in place, and it is carried
-                        // visually by a colour swap plus an icon swap — so
-                        // without this a screen reader is never told the vote
-                        // registered. `liveRegion` is tied to `hasVoted`
-                        // because the flip happens once per player per round;
-                        // the "toca para votar" prompt must not be announced.
-                        Semantics(
-                          liveRegion: hasVoted,
-                          label: hasVoted
-                              ? '¡Voto enviado!'
-                              : 'Toca una respuesta para votar',
-                          excludeSemantics: true,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                hasVoted ? Icons.check_circle : Icons.touch_app,
-                                color: hasVoted
-                                    ? AppColors.mint
-                                    : AppColors.paper.withValues(alpha: 0.72),
-                                size: 20,
-                              ),
-                              const SizedBox(width: AppSpacing.xs),
-                              // Flexible, not bare: the un-voted prompt is the
-                              // longest string in this Row, and beside a
-                              // fixed 20 px icon it overruns the card on a
-                              // narrow phone once the text scale climbs.
-                              Flexible(
-                                child: Text(
-                                  hasVoted
-                                      ? '¡Voto enviado!'
-                                      : 'Toca una respuesta para votar',
-                                  textAlign: TextAlign.center,
-                                  style: AppTypography.body1.copyWith(
-                                    color: hasVoted
-                                        ? AppColors.mint
-                                        : AppColors.paper.withValues(
-                                            alpha: 0.72,
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        LinearProgressIndicator(
-                          value:
-                              room.players
-                                  .where((p) => p.votedFor != null)
-                                  .length /
-                              room.players.length,
-                          backgroundColor: AppColors.graphiteShade,
-                          valueColor: AlwaysStoppedAnimation(
-                            hasVoted ? AppColors.mint : AppColors.lavender,
-                          ),
-                          minHeight: 6,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          '${GameCopy.voteProgress(votedCount, room.players.length)}\n'
-                          '${GameCopy.voteWaiting(votedCount, room.players.length)}',
-                          style: AppTypography.caption.copyWith(
-                            color: AppColors.paper.withValues(alpha: 0.72),
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
+                  BufonStatusPanel(
+                    tone: hasVoted
+                        ? BufonStatusTone.confirmed
+                        : BufonStatusTone.pending,
+                    // The confirmation lands in place, and it is carried
+                    // visually by a colour swap plus an icon swap — so
+                    // without a label a screen reader is never told the vote
+                    // registered. `live` is tied to `hasVoted` because the
+                    // flip happens once per player per round; the "toca para
+                    // votar" prompt must not be announced.
+                    headline: hasVoted
+                        ? '¡Voto enviado!'
+                        : 'Toca una respuesta para votar',
+                    statusLabel: hasVoted
+                        ? '¡Voto enviado!'
+                        : 'Toca una respuesta para votar',
+                    live: hasVoted,
+                    progress:
+                        room.players.where((p) => p.votedFor != null).length /
+                        room.players.length,
+                    message:
+                        '${GameCopy.voteProgress(votedCount, room.players.length)}\n'
+                        '${GameCopy.voteWaiting(votedCount, room.players.length)}',
                   ),
                   const SizedBox(height: AppSpacing.md),
 

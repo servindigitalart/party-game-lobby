@@ -20,6 +20,7 @@ import '../presentation/transitions/keyhole_reveal_transition.dart';
 import '../presentation/widgets/animated_primary_button.dart';
 import '../presentation/widgets/bufon_loader.dart';
 import '../presentation/widgets/bufon_placeholder.dart';
+import '../presentation/widgets/bufon_player_row.dart';
 import '../presentation/widgets/confetti_widget.dart';
 import '../services/haptic_service.dart';
 import '../presentation/navigation/page_transitions.dart';
@@ -412,8 +413,6 @@ class _NightScoreboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phase = context.phase;
-
     // Fase 2B WP5: part of the screen's page scroll now rather than its own
     // scrollable, so the spotlight above it can grow with the text scale
     // instead of squeezing this list to a negative height. Bounded by the
@@ -425,46 +424,15 @@ class _NightScoreboard extends StatelessWidget {
       itemBuilder: (context, index) {
         final player = players[index];
         final position = index + 1;
-        final roundVotes = voteCounts[player.id] ?? 0;
-        final isLeader = position == 1;
 
-        return Card(
-          // `null` falls through to cardTheme (Graphite+1). Only the leader
-          // row is tinted, and with the register's accent rather than the
-          // retired `gold`.
-          color: isLeader ? phase.accent.withValues(alpha: 0.16) : null,
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: isLeader ? phase.accent : AppColors.graphite,
-              child: Text(
-                '$position',
-                style: AppTypography.body2.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isLeader ? phase.onAccent : phase.onSurface,
-                ),
-              ),
-            ),
-            title: Text(
-              player.name,
-              style: AppTypography.body1.copyWith(
-                fontWeight: FontWeight.bold,
-                color: phase.onSurface,
-              ),
-            ),
-            subtitle: Text(
-              '$roundVotes votos esta ronda',
-              style: AppTypography.caption.copyWith(
-                color: phase.onSurfaceMuted,
-              ),
-            ),
-            trailing: Text(
-              '${player.score} pts',
-              style: AppTypography.body1.copyWith(
-                fontWeight: FontWeight.bold,
-                color: phase.accent,
-              ),
-            ),
-          ),
+        return BufonPlayerRow(
+          position: position,
+          name: player.name,
+          detail: '${voteCounts[player.id] ?? 0} votos esta ronda',
+          trailingLabel: '${player.score} pts',
+          // Only the leader row is tinted, and with the register's accent
+          // rather than the retired `gold`.
+          highlighted: position == 1,
         );
       },
     );

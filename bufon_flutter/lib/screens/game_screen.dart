@@ -16,8 +16,10 @@ import '../core/theme/bufon_phase.dart';
 import '../core/theme/motion_tokens.dart';
 import '../presentation/widgets/timer_widget.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../presentation/widgets/bufon_feedback.dart';
 import '../presentation/widgets/bufon_loader.dart';
 import '../presentation/widgets/bufon_placeholder.dart';
+import '../presentation/widgets/bufon_status_panel.dart';
 import '../presentation/widgets/game_progress_widgets.dart';
 import '../presentation/navigation/page_transitions.dart';
 import '../services/haptic_service.dart';
@@ -67,16 +69,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: AppColors.coralShade,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
-            ),
-          ),
-        );
+        BufonFeedback.show(context, message);
       }
     });
   }
@@ -109,16 +102,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final answer = _answerController.text.trim();
     if (answer.isEmpty) {
       HapticService.warning();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Escribe una respuesta'),
-          backgroundColor: AppColors.coralShade,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
-          ),
-        ),
-      );
+      BufonFeedback.show(context, 'Escribe una respuesta');
       return;
     }
 
@@ -130,44 +114,23 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
       if (mounted) {
         HapticService.success();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Respuesta enviada'),
-            backgroundColor: AppColors.mintShade,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
-            ),
-            duration: const Duration(seconds: 1),
-          ),
+        BufonFeedback.show(
+          context,
+          'Respuesta enviada',
+          tone: BufonFeedbackTone.success,
         );
       }
     } on GameException catch (e) {
       HapticService.error();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_friendlyAnswerError(e)),
-            backgroundColor: AppColors.coralShade,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
-            ),
-          ),
-        );
+        BufonFeedback.show(context, _friendlyAnswerError(e));
       }
     } catch (e) {
       HapticService.error();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Algo se atoró al enviar. Inténtalo de nuevo.'),
-            backgroundColor: AppColors.coralShade,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
-            ),
-          ),
+        BufonFeedback.show(
+          context,
+          'Algo se atoró al enviar. Inténtalo de nuevo.',
         );
       }
     }
@@ -188,13 +151,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     } on GameException catch (e) {
       HapticService.error();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_friendlyPhaseError(e)),
-            backgroundColor: AppColors.coralShade,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        BufonFeedback.show(context, _friendlyPhaseError(e));
       }
     } finally {
       if (mounted) {
@@ -466,52 +423,25 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
 
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: AppColors.graphitePlus1,
-                      borderRadius: AppShapes.borderRadiusMd,
-                      border: AppShapes.hairlineBorder(AppColors.graphitePlus1),
-                    ),
-                    child: Column(
-                      children: [
-                        LinearProgressIndicator(
-                          value: room.players.isEmpty
-                              ? 0
-                              : answeredCount / room.players.length,
-                          backgroundColor: AppColors.graphiteShade,
-                          valueColor: const AlwaysStoppedAnimation(
-                            AppColors.sky,
-                          ),
-                          minHeight: 6,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        // Announced once, when the last answer lands — not on
-                        // every player's answer, which is up to eight
-                        // announcements a round, and not on the progress bar's
-                        // every frame. While the room is still answering the
-                        // node stays readable on focus but silent, which also
-                        // keeps `answerWaiting`'s rotating variants from
-                        // re-announcing the same state.
-                        Semantics(
-                          liveRegion: allAnswered,
-                          label: allAnswered
-                              ? 'Todos respondieron'
-                              : '${GameCopy.answerProgress(answeredCount, room.players.length)}. '
-                                    '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
-                          excludeSemantics: true,
-                          child: Text(
-                            '${GameCopy.answerProgress(answeredCount, room.players.length)}\n'
-                            '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.paper.withValues(alpha: 0.72),
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
-                    ),
+                  BufonStatusPanel(
+                    progress: room.players.isEmpty
+                        ? 0
+                        : answeredCount / room.players.length,
+                    message:
+                        '${GameCopy.answerProgress(answeredCount, room.players.length)}\n'
+                        '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
+                    // Announced once, when the last answer lands — not on
+                    // every player's answer, which is up to eight
+                    // announcements a round, and not on the progress bar's
+                    // every frame. While the room is still answering the
+                    // node stays readable on focus but silent, which also
+                    // keeps `answerWaiting`'s rotating variants from
+                    // re-announcing the same state.
+                    statusLabel: allAnswered
+                        ? 'Todos respondieron'
+                        : '${GameCopy.answerProgress(answeredCount, room.players.length)}. '
+                              '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
+                    live: allAnswered,
                   ),
                   const SizedBox(height: AppSpacing.md),
 
