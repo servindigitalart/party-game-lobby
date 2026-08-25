@@ -13,22 +13,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Fase 2B WP11 — the last transient feedback on the register-scoped screens
-/// now goes through `BufonFeedback`.
+/// Fase 2B WP11 — Home's and Lobby's transient feedback now goes through
+/// `BufonFeedback`.
 ///
 /// Each test drives the real screen and the real handler, then reads the tone
-/// off the `SnackBar` the primitive actually built. The boundary this package
-/// works to is the register: Home, Lobby and Final Winner carry real Bufón
-/// registers, so their feedback belongs to the primitive. The five screens
-/// still on `BufonPhase.legacy` keep theirs until the package that recolours
-/// them.
+/// off the `SnackBar` the primitive actually built.
 ///
-/// Final Winner's share-failure path is migrated but **not covered here**. Its
-/// action sits behind the ceremony's staged entrance and the confetti overlay,
-/// and could not be driven under the widget-test binding without altering that
-/// staging — which WP7 owns. The migration there is a one-expression
-/// substitution inside an existing `catch`; the gap is in reach, not in risk.
-/// See the WP11 report.
+/// Final Winner was in this package's scope and was deliberately left out of
+/// it. Its one snackbar is compatible, but the share-failure path sits behind
+/// the ceremony's staged entrance and could not be driven under the
+/// widget-test binding without altering staging WP7 owns — so the migration
+/// was reverted rather than shipped on a source-level claim alone. It waits
+/// for a package that can cover it on its own terms.
+///
+/// The five screens still on `BufonPhase.legacy` keep their feedback until the
+/// package that recolours them.
 
 /// The error fill, read back off a real `BufonFeedback` rather than hard-coded,
 /// so this file cannot drift from the primitive's own palette.

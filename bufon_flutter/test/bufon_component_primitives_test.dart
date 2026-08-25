@@ -437,16 +437,22 @@ void main() {
   group('adoption', () {
     String read(String path) => File(path).readAsStringSync();
 
-    // WP10 brought voting across, WP11 the three remaining register-scoped
-    // screens. The five screens still on `BufonPhase.legacy` are deliberately
-    // absent: their feedback moves with the package that recolours them.
-    test('no register-scoped screen builds a SnackBar of its own', () {
+    // WP8 migrated the answering screen, WP10 voting, WP11 Home and Lobby.
+    //
+    // Two groups are deliberately outside this list. The five screens still on
+    // `BufonPhase.legacy` move with the package that recolours them. Final
+    // Winner is the other: it carries a real register and its one snackbar is
+    // compatible, but its share-failure path sits behind the ceremony's staged
+    // entrance and cannot be driven under the widget-test binding without
+    // altering staging WP7 owns. It keeps its own snackbar until that path can
+    // be covered on its own terms — asserting adoption there would be claiming
+    // something no test checks.
+    test('every adopted screen builds no SnackBar of its own', () {
       for (final path in [
         'lib/screens/game_screen.dart',
         'lib/screens/voting_screen.dart',
         'lib/screens/home_screen.dart',
         'lib/screens/lobby_screen.dart',
-        'lib/screens/final_winner_screen.dart',
       ]) {
         expect(read(path), isNot(contains('SnackBar')), reason: path);
         expect(read(path), isNot(contains('ScaffoldMessenger')), reason: path);
