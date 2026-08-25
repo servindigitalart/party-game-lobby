@@ -280,12 +280,16 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          GameProgressBar(
-                            currentRound: room.currentRound,
-                            totalRounds: room.totalRounds,
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-
+                          // Fase 2B WP15 (G13): the round used to be stated
+                          // twice. `RoundIndicator` in the app bar already
+                          // reads "Ronda 3/5"; `GameProgressBar` repeated the
+                          // same `currentRound / totalRounds` a hundred pixels
+                          // below it as segments, a sentence and a percentage.
+                          // The app bar keeps it, as secondary context, and
+                          // the timer is left as the one progress signal the
+                          // player is meant to feel. The bar itself is
+                          // untouched and still serves Voting, whose app bar
+                          // is the only other place the round is stated.
                           TimerWidget(
                             remainingSeconds: _remainingSeconds,
                             totalSeconds: room.roundDuration,
