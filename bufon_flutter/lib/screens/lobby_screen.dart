@@ -21,6 +21,7 @@ import '../core/telemetry/telemetry_event.dart';
 import '../presentation/navigation/page_transitions.dart';
 import '../presentation/screens/paywall_screen.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../presentation/widgets/bufon_feedback.dart';
 import '../presentation/widgets/bufon_loader.dart';
 import '../presentation/widgets/bufon_placeholder.dart';
 import '../services/haptic_service.dart';
@@ -113,9 +114,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     // Show message after navigation
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: AppColors.coral),
-        );
+        BufonFeedback.show(context, message);
       }
     });
   }
@@ -177,12 +176,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_friendlyStartError(e)),
-            backgroundColor: AppColors.coral,
-          ),
-        );
+        BufonFeedback.show(context, _friendlyStartError(e));
       }
     }
   }

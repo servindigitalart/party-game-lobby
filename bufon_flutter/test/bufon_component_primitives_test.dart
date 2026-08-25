@@ -437,12 +437,16 @@ void main() {
   group('adoption', () {
     String read(String path) => File(path).readAsStringSync();
 
-    // WP10 brought voting's four feedback paths across too, so the claim is
-    // now about both loop screens rather than only the one WP8 migrated.
-    test('neither loop screen builds a SnackBar of its own', () {
+    // WP10 brought voting across, WP11 the three remaining register-scoped
+    // screens. The five screens still on `BufonPhase.legacy` are deliberately
+    // absent: their feedback moves with the package that recolours them.
+    test('no register-scoped screen builds a SnackBar of its own', () {
       for (final path in [
         'lib/screens/game_screen.dart',
         'lib/screens/voting_screen.dart',
+        'lib/screens/home_screen.dart',
+        'lib/screens/lobby_screen.dart',
+        'lib/screens/final_winner_screen.dart',
       ]) {
         expect(read(path), isNot(contains('SnackBar')), reason: path);
         expect(read(path), isNot(contains('ScaffoldMessenger')), reason: path);

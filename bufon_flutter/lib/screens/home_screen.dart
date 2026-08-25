@@ -13,6 +13,7 @@ import '../presentation/screens/leaderboard_screen.dart';
 import '../presentation/screens/profile_screen.dart';
 import '../presentation/widgets/animated_primary_button.dart';
 import '../presentation/widgets/brand_mark.dart';
+import '../presentation/widgets/bufon_feedback.dart';
 import '../presentation/widgets/season_countdown_banner.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
@@ -129,9 +130,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    BufonFeedback.show(context, message);
   }
 
   String _friendlyRoomError(Object error, {required String fallback}) {
