@@ -32,39 +32,62 @@ void main() {
       expect(label!.group(1), expected);
     });
 
+    /// The value paired with [key] in the app's own Info.plist.
+    ///
+    /// `ios/Runner/Info.plist` is authoritative for the shipped app: the
+    /// Runner target sets `INFOPLIST_FILE = Runner/Info.plist` in all three
+    /// configurations. `GENERATE_INFOPLIST_FILE = YES` in the same project
+    /// file belongs to RunnerTests, which is a different bundle.
+    String? plistValue(String key) => RegExp(
+      '<key>$key</key>\\s*<string>([^<]*)</string>',
+    ).firstMatch(read('ios/Runner/Info.plist'))?.group(1);
+
     test('iOS displays the app as Bufón', () {
-      final plist = read('ios/Runner/Info.plist');
+      // CFBundleDisplayName is the home-screen label.
+      final display = plistValue('CFBundleDisplayName');
 
-      // CFBundleDisplayName is the home-screen label. Its value is the next
-      // <string> after the key, which is how a plist pairs them.
-      final display = RegExp(
-        r'<key>CFBundleDisplayName</key>\s*<string>([^<]*)</string>',
-      ).firstMatch(plist);
+      expect(display, isNotNull, reason: 'no CFBundleDisplayName in Info.plist');
+      expect(display, expected);
+    });
 
-      expect(
-        display,
-        isNotNull,
-        reason: 'no CFBundleDisplayName in Info.plist',
-      );
-      expect(display!.group(1), expected);
+    test('the iOS short name matches the display name', () {
+      // CFBundleName is the short name iOS falls back to where the display
+      // name does not fit — Settings, storage listings. It is not an
+      // identifier: CFBundleIdentifier is, and it stays
+      // `\$(PRODUCT_BUNDLE_IDENTIFIER)`. Left at the scaffolding value it was
+      // the one place a player could still be shown `bufon_flutter`.
+      final name = plistValue('CFBundleName');
+
+      expect(name, isNotNull, reason: 'no CFBundleName in Info.plist');
+      expect(name, expected);
+      // Apple caps this one at 15 characters, unlike the display name.
+      expect(name!.length, lessThanOrEqualTo(15));
+    });
+
+    test('the bundle identifier is still a build variable, not a name', () {
+      // Guards the edit above from drifting into identity: whatever happens
+      // to the two visible names, the identifier stays what Xcode injects.
+      expect(plistValue('CFBundleIdentifier'), r'$(PRODUCT_BUNDLE_IDENTIFIER)');
     });
 
     test('neither platform still carries a scaffolding name', () {
       // The specific regression this guards: `flutter create` writes the
       // package directory name into both files, and a regenerated platform
       // folder would silently put it back.
-      for (final path in const [
-        'android/app/src/main/AndroidManifest.xml',
-        'ios/Runner/Info.plist',
-      ]) {
-        final src = read(path);
-        final label = RegExp(
-          r'android:label="([^"]*)"|<key>CFBundleDisplayName</key>\s*<string>([^<]*)</string>',
-        ).firstMatch(src);
-        final value = label?.group(1) ?? label?.group(2);
+      final manifest = read('android/app/src/main/AndroidManifest.xml');
+      final values = <String, String?>{
+        'android:label': RegExp(
+          r'android:label="([^"]*)"',
+        ).firstMatch(manifest)?.group(1),
+        'CFBundleDisplayName': plistValue('CFBundleDisplayName'),
+        // Included deliberately: the secondary name is a place the
+        // scaffolding string survived once already.
+        'CFBundleName': plistValue('CFBundleName'),
+      };
 
-        expect(value, isNot('bufon_flutter'), reason: path);
-        expect(value, isNot('Bufon Flutter'), reason: path);
+      for (final entry in values.entries) {
+        expect(entry.value, isNot('bufon_flutter'), reason: entry.key);
+        expect(entry.value, isNot('Bufon Flutter'), reason: entry.key);
       }
     });
 
