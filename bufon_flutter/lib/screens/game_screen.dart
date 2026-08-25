@@ -63,15 +63,15 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
     ref.read(roomCodeProvider.notifier).state = null;
 
+    // Before the navigation, for the same reason as `lobby_screen`: the root
+    // messenger sits above the Navigator, so a message handed over now
+    // survives the retreat, while one scheduled after it was discarded by a
+    // `mounted` guard on an already-disposed route.
+    BufonFeedback.show(context, message);
+
     // Leaving the room is a retreat (Capítulo 23) — the player is being put
     // back out of the game, not moved forward through it.
     context.pushAndRemoveAllFade(const HomeScreen());
-
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        BufonFeedback.show(context, message);
-      }
-    });
   }
 
   void _startTimer(DateTime startTime, int duration) {

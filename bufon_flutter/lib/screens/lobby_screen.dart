@@ -109,14 +109,15 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     // Clear room code
     ref.read(roomCodeProvider.notifier).state = null;
 
-    context.replaceFade(const HomeScreen());
+    // Before the navigation, not 500 ms after it. `BufonFeedback` hands the
+    // finished message to the root messenger `MaterialApp` owns, which lives
+    // above the Navigator — so it outlives this route and is still on screen
+    // once Home has faded in. Scheduling it afterwards never worked:
+    // `pushReplacement` disposes this route when the 250 ms retreat completes,
+    // so the `mounted` guard the delayed callback needed was already false.
+    BufonFeedback.show(context, message);
 
-    // Show message after navigation
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        BufonFeedback.show(context, message);
-      }
-    });
+    context.replaceFade(const HomeScreen());
   }
 
   Future<void> _startGame(
