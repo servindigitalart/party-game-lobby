@@ -20,6 +20,7 @@ import '../models/player.dart';
 import '../presentation/transitions/keyhole_reveal_transition.dart';
 import '../presentation/widgets/confetti_widget.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../presentation/widgets/bufon_feedback.dart';
 import '../presentation/widgets/share_victory_card.dart';
 import '../presentation/navigation/page_transitions.dart';
 import '../services/haptic_service.dart';
@@ -368,11 +369,9 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('No se pudo compartir. Inténtalo de nuevo.'),
-            backgroundColor: AppColors.coralShade,
-          ),
+        BufonFeedback.show(
+          context,
+          'No se pudo compartir. Inténtalo de nuevo.',
         );
       }
     } finally {
