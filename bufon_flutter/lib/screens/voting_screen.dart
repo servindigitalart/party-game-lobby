@@ -17,6 +17,7 @@ import '../core/theme/bufon_phase.dart';
 import '../core/theme/motion_tokens.dart';
 import '../presentation/widgets/game_card.dart';
 import '../presentation/widgets/animated_primary_button.dart';
+import '../presentation/widgets/bufon_feedback.dart';
 import '../presentation/widgets/bufon_loader.dart';
 import '../presentation/widgets/bufon_placeholder.dart';
 import '../presentation/widgets/bufon_status_panel.dart';
@@ -64,16 +65,10 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
 
       if (context.mounted) {
         HapticService.success();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('¡Voto registrado!'),
-            backgroundColor: AppColors.mintShade,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
-            ),
-            duration: const Duration(seconds: 1),
-          ),
+        BufonFeedback.show(
+          context,
+          '¡Voto registrado!',
+          tone: BufonFeedbackTone.success,
         );
       }
     } on VotingException catch (e) {
@@ -101,31 +96,14 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
             message = e.message;
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: AppColors.coralShade,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
-            ),
-          ),
-        );
+        BufonFeedback.show(context, message);
       }
     } catch (e) {
       HapticService.error();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Algo se atoró al registrar tu voto. Inténtalo de nuevo.',
-            ),
-            backgroundColor: AppColors.coralShade,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.buttonRadius),
-            ),
-          ),
+        BufonFeedback.show(
+          context,
+          'Algo se atoró al registrar tu voto. Inténtalo de nuevo.',
         );
       }
     }
@@ -146,13 +124,7 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
     } on RoomException catch (e) {
       HapticService.error();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_friendlyResultError(e)),
-            backgroundColor: AppColors.coralShade,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        BufonFeedback.show(context, _friendlyResultError(e));
       }
     } finally {
       if (mounted) {

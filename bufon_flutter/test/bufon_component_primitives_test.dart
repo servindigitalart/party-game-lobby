@@ -437,8 +437,16 @@ void main() {
   group('adoption', () {
     String read(String path) => File(path).readAsStringSync();
 
-    test('game_screen builds no SnackBar of its own', () {
-      expect(read('lib/screens/game_screen.dart'), isNot(contains('SnackBar')));
+    // WP10 brought voting's four feedback paths across too, so the claim is
+    // now about both loop screens rather than only the one WP8 migrated.
+    test('neither loop screen builds a SnackBar of its own', () {
+      for (final path in [
+        'lib/screens/game_screen.dart',
+        'lib/screens/voting_screen.dart',
+      ]) {
+        expect(read(path), isNot(contains('SnackBar')), reason: path);
+        expect(read(path), isNot(contains('ScaffoldMessenger')), reason: path);
+      }
     });
 
     test('both loop screens take their progress panel from the primitive', () {
