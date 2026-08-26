@@ -1,40 +1,6 @@
 // models/title.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-/// Rarity of a BUFON title
-enum TitleRarity {
-  common,
-  rare,
-  epic,
-  legendary;
-
-  String get displayName {
-    switch (this) {
-      case TitleRarity.common:
-        return 'Común';
-      case TitleRarity.rare:
-        return 'Raro';
-      case TitleRarity.epic:
-        return 'Épico';
-      case TitleRarity.legendary:
-        return 'Legendario';
-    }
-  }
-
-  /// Color for rarity
-  int get color {
-    switch (this) {
-      case TitleRarity.common:
-        return 0xFFB3B3B3; // Gray
-      case TitleRarity.rare:
-        return 0xFF2196F3; // Blue
-      case TitleRarity.epic:
-        return 0xFF9C27B0; // Purple
-      case TitleRarity.legendary:
-        return 0xFFFFD700; // Gold
-    }
-  }
-}
+import '../core/theme/rarity.dart';
 
 /// Type of unlock condition
 enum UnlockConditionType {
@@ -74,7 +40,7 @@ class BufonTitle {
   final String id;
   final String name;
   final String description;
-  final TitleRarity rarity;
+  final Rarity rarity;
   final UnlockConditionType unlockConditionType;
   final int unlockValue;
   final bool isSecret;
@@ -96,9 +62,9 @@ class BufonTitle {
       id: json['id'] as String,
       name: json['name'] as String,
       description: json['description'] as String,
-      rarity: TitleRarity.values.firstWhere(
+      rarity: Rarity.values.firstWhere(
         (r) => r.name == json['rarity'],
-        orElse: () => TitleRarity.common,
+        orElse: () => Rarity.common,
       ),
       unlockConditionType: UnlockConditionType.values.firstWhere(
         (t) => t.name == json['unlockConditionType'],
@@ -198,7 +164,7 @@ class Titles {
       id: 'npc_grupo',
       name: 'NPC del Grupo',
       description: 'El que siempre está pero nadie nota',
-      rarity: TitleRarity.common,
+      rarity: Rarity.common,
       unlockConditionType: UnlockConditionType.games,
       unlockValue: 5,
     ),
@@ -206,7 +172,7 @@ class Titles {
       id: 'mitomano_certificado',
       name: 'Mitómano Certificado',
       description: 'Especialista en inventar historias',
-      rarity: TitleRarity.common,
+      rarity: Rarity.common,
       unlockConditionType: UnlockConditionType.votes,
       unlockValue: 10,
     ),
@@ -216,7 +182,7 @@ class Titles {
       id: 'agente_caos',
       name: 'Agente del Caos',
       description: 'Maestro en crear desmadre',
-      rarity: TitleRarity.rare,
+      rarity: Rarity.rare,
       unlockConditionType: UnlockConditionType.votes,
       unlockValue: 50,
     ),
@@ -224,7 +190,7 @@ class Titles {
       id: 'rey_drama',
       name: 'Rey del Drama',
       description: 'Todo es un evento para ti',
-      rarity: TitleRarity.rare,
+      rarity: Rarity.rare,
       unlockConditionType: UnlockConditionType.wins,
       unlockValue: 10,
     ),
@@ -232,7 +198,7 @@ class Titles {
       id: 'down_bad_pro',
       name: 'Down Bad Profesional',
       description: 'En el fondo del barranco emocional',
-      rarity: TitleRarity.rare,
+      rarity: Rarity.rare,
       unlockConditionType: UnlockConditionType.xp,
       unlockValue: 1000,
     ),
@@ -240,7 +206,7 @@ class Titles {
       id: 'viral_grupo',
       name: 'Viral del Grupo',
       description: 'Tus respuestas son legendarias',
-      rarity: TitleRarity.rare,
+      rarity: Rarity.rare,
       unlockConditionType: UnlockConditionType.votes,
       unlockValue: 100,
     ),
@@ -250,7 +216,7 @@ class Titles {
       id: 'arquitecto_desmadre',
       name: 'Arquitecto del Desmadre',
       description: 'Planificas el caos con precisión',
-      rarity: TitleRarity.epic,
+      rarity: Rarity.epic,
       unlockConditionType: UnlockConditionType.wins,
       unlockValue: 25,
     ),
@@ -258,7 +224,7 @@ class Titles {
       id: 'corazon_roto_oficial',
       name: 'Corazón Roto Oficial',
       description: 'Experto en dramas románticos',
-      rarity: TitleRarity.epic,
+      rarity: Rarity.epic,
       unlockConditionType: UnlockConditionType.xp,
       unlockValue: 2500,
     ),
@@ -266,7 +232,7 @@ class Titles {
       id: 'maestro_meme',
       name: 'Maestro del Meme',
       description: 'Todo lo conviertes en meme',
-      rarity: TitleRarity.epic,
+      rarity: Rarity.epic,
       unlockConditionType: UnlockConditionType.votes,
       unlockValue: 250,
     ),
@@ -276,7 +242,7 @@ class Titles {
       id: 'bufon_supremo',
       name: 'Bufón Supremo',
       description: 'El más caótico de todos',
-      rarity: TitleRarity.legendary,
+      rarity: Rarity.legendary,
       unlockConditionType: UnlockConditionType.leaderboardRank,
       unlockValue: 10,
     ),
@@ -284,7 +250,7 @@ class Titles {
       id: 'leyenda_semanal',
       name: 'Leyenda Semanal',
       description: 'Dominaste el ranking semanal',
-      rarity: TitleRarity.legendary,
+      rarity: Rarity.legendary,
       unlockConditionType: UnlockConditionType.leaderboardRank,
       unlockValue: 3,
     ),
@@ -292,7 +258,7 @@ class Titles {
       id: 'top_global',
       name: 'Top 10 Global',
       description: 'Entre los mejores del mundo',
-      rarity: TitleRarity.legendary,
+      rarity: Rarity.legendary,
       unlockConditionType: UnlockConditionType.leaderboardRank,
       unlockValue: 10,
     ),
@@ -302,7 +268,7 @@ class Titles {
       id: 'season_champion_legendary',
       name: '👑 Campeón de Temporada',
       description: '¡Primer lugar en la temporada competitiva!',
-      rarity: TitleRarity.legendary,
+      rarity: Rarity.legendary,
       unlockConditionType: UnlockConditionType.achievement,
       unlockValue: 0,
       isSecret: true,
@@ -320,19 +286,19 @@ class Titles {
   }
 
   /// Get titles by rarity
-  static List<BufonTitle> getByRarity(TitleRarity rarity) {
+  static List<BufonTitle> getByRarity(Rarity rarity) {
     return all.where((title) => title.rarity == rarity).toList();
   }
 
   /// Get common titles
-  static List<BufonTitle> get common => getByRarity(TitleRarity.common);
+  static List<BufonTitle> get common => getByRarity(Rarity.common);
 
   /// Get rare titles
-  static List<BufonTitle> get rare => getByRarity(TitleRarity.rare);
+  static List<BufonTitle> get rare => getByRarity(Rarity.rare);
 
   /// Get epic titles
-  static List<BufonTitle> get epic => getByRarity(TitleRarity.epic);
+  static List<BufonTitle> get epic => getByRarity(Rarity.epic);
 
   /// Get legendary titles
-  static List<BufonTitle> get legendary => getByRarity(TitleRarity.legendary);
+  static List<BufonTitle> get legendary => getByRarity(Rarity.legendary);
 }

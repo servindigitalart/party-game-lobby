@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/rarity.dart';
 import '../../models/title.dart';
 import '../widgets/bufon_loader.dart';
 import '../widgets/bufon_placeholder.dart';
@@ -88,10 +89,10 @@ class TitleSelectorDialog extends ConsumerWidget {
                   // Sort by rarity (legendary first)
                   availableTitles.sort((a, b) {
                     const rarityOrder = {
-                      TitleRarity.legendary: 0,
-                      TitleRarity.epic: 1,
-                      TitleRarity.rare: 2,
-                      TitleRarity.common: 3,
+                      Rarity.legendary: 0,
+                      Rarity.epic: 1,
+                      Rarity.rare: 2,
+                      Rarity.common: 3,
                     };
                     return rarityOrder[a.rarity]!.compareTo(
                       rarityOrder[b.rarity]!,
@@ -249,7 +250,7 @@ class TitleSelectorDialog extends ConsumerWidget {
                   color: isEquipped
                       ? AppColors.primary
                       : title != null
-                      ? Color(title.rarity.color)
+                      ? title.rarity.color
                       : AppColors.textSecondary,
                   width: isEquipped ? 2 : 1,
                 ),
@@ -262,9 +263,7 @@ class TitleSelectorDialog extends ConsumerWidget {
                     height: 40,
                     decoration: BoxDecoration(
                       color: title != null
-                          ? Color(
-                              title.rarity.color,
-                            ).withAlpha((0.2 * 255).toInt())
+                          ? title.rarity.color.withAlpha((0.2 * 255).toInt())
                           : AppColors.textSecondary.withAlpha(
                               (0.2 * 255).toInt(),
                             ),
@@ -273,7 +272,7 @@ class TitleSelectorDialog extends ConsumerWidget {
                     child: Icon(
                       title == null ? Icons.close : Icons.military_tech,
                       color: title != null
-                          ? Color(title.rarity.color)
+                          ? title.rarity.color
                           : AppColors.textSecondary,
                       size: 20,
                     ),
@@ -290,7 +289,7 @@ class TitleSelectorDialog extends ConsumerWidget {
                           Text(
                             title.name,
                             style: AppTypography.body1.copyWith(
-                              color: Color(title.rarity.color),
+                              color: title.rarity.color,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

@@ -1,6 +1,7 @@
 // providers/title_providers.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/controllers/title_controller.dart';
+import '../core/theme/rarity.dart';
 import '../models/title.dart';
 import 'game_providers.dart';
 import 'progression_providers.dart';
@@ -69,7 +70,7 @@ final allTitlesProvider = Provider<List<BufonTitle>>((ref) {
 });
 
 /// Titles by rarity
-final titlesByRarityProvider = Provider.family<List<BufonTitle>, TitleRarity>((
+final titlesByRarityProvider = Provider.family<List<BufonTitle>, Rarity>((
   ref,
   rarity,
 ) {

@@ -347,9 +347,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: Color(
-                      int.parse('0xFF${avatar.rarity.color.substring(1)}'),
-                    ),
+                    color: avatar.rarity.color,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -627,17 +625,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 vertical: AppSpacing.sm,
               ),
               decoration: BoxDecoration(
-                color: Color(
-                  int.parse('0xFF${avatar.rarity.color.substring(1)}'),
-                ).withValues(alpha: 0.2),
+                color: avatar.rarity.color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 avatar.rarity.displayName,
                 style: AppTypography.caption.copyWith(
-                  color: Color(
-                    int.parse('0xFF${avatar.rarity.color.substring(1)}'),
-                  ),
+                  color: avatar.rarity.color,
                   fontWeight: FontWeight.bold,
                 ),
               ),

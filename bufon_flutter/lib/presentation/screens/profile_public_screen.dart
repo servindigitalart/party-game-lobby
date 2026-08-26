@@ -284,15 +284,15 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color(title.rarity.color).withValues(alpha: 0.2),
-                Color(title.rarity.color).withValues(alpha: 0.1),
+                title.rarity.color.withValues(alpha: 0.2),
+                title.rarity.color.withValues(alpha: 0.1),
               ],
             ),
-            border: Border.all(color: Color(title.rarity.color), width: 2),
+            border: Border.all(color: title.rarity.color, width: 2),
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Color(title.rarity.color).withValues(alpha: 0.3),
+                color: title.rarity.color.withValues(alpha: 0.3),
                 blurRadius: 15,
               ),
             ],
@@ -302,7 +302,7 @@ class _ProfilePublicScreenState extends ConsumerState<ProfilePublicScreen>
               Text(
                 title.name,
                 style: AppTypography.h2.copyWith(
-                  color: Color(title.rarity.color),
+                  color: title.rarity.color,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,

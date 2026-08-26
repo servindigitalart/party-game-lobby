@@ -1,38 +1,6 @@
 // models/avatar.dart
 
-/// Rarity levels for avatars
-enum AvatarRarity {
-  common,
-  rare,
-  epic,
-  legendary;
-
-  String get displayName {
-    switch (this) {
-      case AvatarRarity.common:
-        return 'Común';
-      case AvatarRarity.rare:
-        return 'Raro';
-      case AvatarRarity.epic:
-        return 'Épico';
-      case AvatarRarity.legendary:
-        return 'Legendario';
-    }
-  }
-
-  String get color {
-    switch (this) {
-      case AvatarRarity.common:
-        return '#CCCCCC'; // Gray
-      case AvatarRarity.rare:
-        return '#4A9EFF'; // Blue
-      case AvatarRarity.epic:
-        return '#B24AFF'; // Purple
-      case AvatarRarity.legendary:
-        return '#FFD700'; // Gold
-    }
-  }
-}
+import '../core/theme/rarity.dart';
 
 /// Unlock requirement types
 enum UnlockRequirement {
@@ -66,7 +34,7 @@ class Avatar {
   final String id;
   final String name;
   final String emoji; // Avatar representation
-  final AvatarRarity rarity;
+  final Rarity rarity;
   final UnlockRequirement requirementType;
   final int requirementValue;
   final String? achievementId; // If requirementType is achievement
@@ -86,9 +54,9 @@ class Avatar {
       id: json['id'] as String,
       name: json['name'] as String,
       emoji: json['emoji'] as String,
-      rarity: AvatarRarity.values.firstWhere(
+      rarity: Rarity.values.firstWhere(
         (r) => r.name == json['rarity'],
-        orElse: () => AvatarRarity.common,
+        orElse: () => Rarity.common,
       ),
       requirementType: UnlockRequirement.values.firstWhere(
         (r) => r.name == json['requirementType'],
@@ -122,7 +90,7 @@ class Avatar {
     String? id,
     String? name,
     String? emoji,
-    AvatarRarity? rarity,
+    Rarity? rarity,
     UnlockRequirement? requirementType,
     int? requirementValue,
     String? achievementId,
@@ -157,7 +125,7 @@ class Avatars {
     id: 'default',
     name: 'Bufón Clásico',
     emoji: '🤡',
-    rarity: AvatarRarity.common,
+    rarity: Rarity.common,
     requirementType: UnlockRequirement.level,
     requirementValue: 1,
   );
@@ -166,7 +134,7 @@ class Avatars {
     id: 'smiley',
     name: 'Sonriente',
     emoji: '😊',
-    rarity: AvatarRarity.common,
+    rarity: Rarity.common,
     requirementType: UnlockRequirement.gamesPlayed,
     requirementValue: 1,
   );
@@ -175,7 +143,7 @@ class Avatars {
     id: 'cool',
     name: 'Cool',
     emoji: '😎',
-    rarity: AvatarRarity.common,
+    rarity: Rarity.common,
     requirementType: UnlockRequirement.level,
     requirementValue: 2,
   );
@@ -185,7 +153,7 @@ class Avatars {
     id: 'party',
     name: 'Fiestero',
     emoji: '🥳',
-    rarity: AvatarRarity.rare,
+    rarity: Rarity.rare,
     requirementType: UnlockRequirement.gamesPlayed,
     requirementValue: 5,
   );
@@ -194,7 +162,7 @@ class Avatars {
     id: 'genius',
     name: 'Genio',
     emoji: '🤓',
-    rarity: AvatarRarity.rare,
+    rarity: Rarity.rare,
     requirementType: UnlockRequirement.wins,
     requirementValue: 3,
   );
@@ -203,7 +171,7 @@ class Avatars {
     id: 'devil',
     name: 'Diablillo',
     emoji: '😈',
-    rarity: AvatarRarity.rare,
+    rarity: Rarity.rare,
     requirementType: UnlockRequirement.votesReceived,
     requirementValue: 20,
   );
@@ -213,7 +181,7 @@ class Avatars {
     id: 'star',
     name: 'Estrella',
     emoji: '⭐',
-    rarity: AvatarRarity.epic,
+    rarity: Rarity.epic,
     requirementType: UnlockRequirement.achievement,
     requirementValue: 1,
     achievementId: 'ten_games',
@@ -223,7 +191,7 @@ class Avatars {
     id: 'fire',
     name: 'Fuego',
     emoji: '🔥',
-    rarity: AvatarRarity.epic,
+    rarity: Rarity.epic,
     requirementType: UnlockRequirement.wins,
     requirementValue: 10,
   );
@@ -232,7 +200,7 @@ class Avatars {
     id: 'robot',
     name: 'Robot',
     emoji: '🤖',
-    rarity: AvatarRarity.epic,
+    rarity: Rarity.epic,
     requirementType: UnlockRequirement.gamesPlayed,
     requirementValue: 25,
   );
@@ -242,7 +210,7 @@ class Avatars {
     id: 'crown',
     name: 'Corona Real',
     emoji: '👑',
-    rarity: AvatarRarity.legendary,
+    rarity: Rarity.legendary,
     requirementType: UnlockRequirement.achievement,
     requirementValue: 1,
     achievementId: 'twenty_wins',
@@ -252,7 +220,7 @@ class Avatars {
     id: 'diamond',
     name: 'Diamante',
     emoji: '💎',
-    rarity: AvatarRarity.legendary,
+    rarity: Rarity.legendary,
     requirementType: UnlockRequirement.level,
     requirementValue: 10,
   );
@@ -261,7 +229,7 @@ class Avatars {
     id: 'night_pass',
     name: 'Luna VIP',
     emoji: '🌙',
-    rarity: AvatarRarity.legendary,
+    rarity: Rarity.legendary,
     requirementType: UnlockRequirement.nightPass,
     requirementValue: 1,
   );
@@ -292,7 +260,7 @@ class Avatars {
   }
 
   /// Get avatars by rarity
-  static List<Avatar> getByRarity(AvatarRarity rarity) {
+  static List<Avatar> getByRarity(Rarity rarity) {
     return all.where((a) => a.rarity == rarity).toList();
   }
 }

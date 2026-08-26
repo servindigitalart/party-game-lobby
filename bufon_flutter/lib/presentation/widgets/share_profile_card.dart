@@ -139,11 +139,11 @@ class ShareProfileCard {
           const Radius.circular(12),
         );
         final titleBgPaint = Paint()
-          ..color = Color(equippedTitle.rarity.color).withValues(alpha: 0.2);
+          ..color = equippedTitle.rarity.color.withValues(alpha: 0.2);
         canvas.drawRRect(titleBg, titleBgPaint);
 
         final titleBorderPaint = Paint()
-          ..color = Color(equippedTitle.rarity.color)
+          ..color = equippedTitle.rarity.color
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2;
         canvas.drawRRect(titleBg, titleBorderPaint);
@@ -152,7 +152,7 @@ class ShareProfileCard {
           equippedTitle.name,
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          color: Color(equippedTitle.rarity.color),
+          color: equippedTitle.rarity.color,
           width: width - 100,
           textAlign: TextAlign.center,
         );
