@@ -69,4 +69,34 @@ class Player {
     lastSeen: lastSeen ?? this.lastSeen,
     isOnline: isOnline ?? this.isOnline,
   );
+
+  /// True when this player has submitted a usable answer this round.
+  ///
+  /// Matches the server's definition exactly — `moveToVoting`
+  /// (`room_repository.dart`) and the ballot builder (`voting_screen.dart`)
+  /// both require a non-empty answer after trimming, while the screens used
+  /// to test only `currentAnswer != null`. Audit B **G-1J** recorded that
+  /// divergence as latent; stating it once here removes it.
+  bool get hasAnswered =>
+      currentAnswer != null && currentAnswer!.trim().isNotEmpty;
+}
+
+/// Who a phase is actually waiting for.
+///
+/// WP22 / audit B **G-1F**: both completion predicates counted **every**
+/// player document, with no filter at all. One player who had dropped or
+/// backgrounded made `allAnswered` permanently false — so answering burned
+/// the whole clock, and voting, which has no clock, stalled forever with no
+/// recovery path. `Player.isDisconnected` already modelled the concept and
+/// had **zero call sites in the entire application**; this extension is the
+/// call site it never had.
+///
+/// Deliberately *not* a filter on the room's roster: a disconnected player is
+/// still in the room, still owns their score, and is still removed only by
+/// `cleanupDisconnectedPlayers`. This narrows exactly one thing — who a phase
+/// is allowed to wait for.
+extension PlayerEligibility on Iterable<Player> {
+  /// Players a phase may block on. Presence, not participation: whether they
+  /// have answered or voted is the *predicate's* business, not this one's.
+  Iterable<Player> get eligible => where((player) => !player.isDisconnected);
 }

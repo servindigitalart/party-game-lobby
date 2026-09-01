@@ -38,6 +38,15 @@ class _StubRepository extends RoomRepository {
   final Object? Function()? onVote;
   final Object? Function()? onAdvance;
 
+  /// WP22 added the disconnect sweep voting was missing (audit B G-1F /
+  /// R-10), so `_moveToResults` now calls this before the transition. Without
+  /// the override the call falls through to the real Firestore path and
+  /// throws `ROOM_NOT_FOUND` against the empty fake, which would mask the
+  /// advance failure these tests are actually about. Same shape as the other
+  /// overrides here: cover the methods the screen calls, change nothing else.
+  @override
+  Future<Room?> cleanupDisconnectedPlayers(String roomCode) async => null;
+
   @override
   Future<void> submitVoteTransaction(
     String roomCode,

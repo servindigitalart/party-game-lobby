@@ -28,6 +28,13 @@ import '../../core/telemetry/telemetry_context.dart';
 /// derived in [watchRoom] instead of being emitted by each write path, so no
 /// transition is reported twice.
 class RoomRepository {
+  /// The fewest answers that make a votable ballot.
+  ///
+  /// Derived from the vote rules, not chosen: with one answer its author has
+  /// no legal vote (self-votes are forbidden and every other card is absent),
+  /// so voting could never complete. See `moveToVoting`.
+  static const int _minimumBallotAnswers = 2;
+
   final FirebaseFirestore _firestore;
   final FirebaseFunctions? _injectedFunctions;
   final GameTelemetryService _telemetry = GameTelemetryService.instance;
@@ -411,6 +418,33 @@ class RoomRepository {
           throw RoomException(
             'No answers submitted',
             code: 'NO_ANSWERS_SUBMITTED',
+          );
+        }
+
+        // WP22 / audit B G-1G. A ballot needs two answers to be votable, and
+        // this guard is where that becomes true.
+        //
+        // The number is *derived*, not chosen: `submitVote` rejects a
+        // self-vote unconditionally (`submitVote.ts:49-51`,
+        // SELF_VOTE_FORBIDDEN) and rejects a vote for anyone with no answer
+        // (`:89-95`, VOTED_FOR_HAS_NO_ANSWER). With exactly one answer the
+        // ballot holds exactly one card, and its author is the one person
+        // forbidden from choosing it — so that player has **no legal vote in
+        // existence**, `allVoted` can never become true, and voting has no
+        // clock to rescue it. The room was permanently dead.
+        //
+        // R-09 asks for this to be made unreachable *"at the transition
+        // guard, not in the UI"*. This is that guard. The room stays in
+        // `answering`, where the answer field is still live and
+        // `submitAnswerTransaction` still accepts — it checks the phase, not
+        // the clock — so a second answer arriving at any time advances the
+        // round on its own. **The recovery path is the phase the room is
+        // already in**, which is why no round-retry mechanic is introduced
+        // (R-09 non-goal: inventing one is a product decision).
+        if (answeredCount < _minimumBallotAnswers) {
+          throw RoomException(
+            'A ballot needs at least $_minimumBallotAnswers answers',
+            code: 'NOT_ENOUGH_ANSWERS',
           );
         }
 

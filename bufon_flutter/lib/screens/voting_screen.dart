@@ -38,6 +38,10 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
   Timer? _autoAdvanceTimer;
   bool _isAdvancing = false;
 
+  /// WP22. One completed transition attempt per screen — see the twin in
+  /// `game_screen.dart` for why `_autoAdvanceTimer` alone re-armed itself.
+  bool _advanceRequested = false;
+
   @override
   void initState() {
     super.initState();
@@ -119,9 +123,24 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
     setState(() => _isAdvancing = true);
     try {
       final repository = ref.read(roomRepositoryProvider);
+      // WP22 / audit B G-1F, R-10 (sweep variant). Voting was the one stage
+      // with no disconnect sweep — `cleanupDisconnectedPlayers` was called
+      // from the lobby, from answering and from the round result, and never
+      // from here. A player who dropped mid-vote therefore left `votedFor`
+      // null on a document nothing would ever remove, and since voting has
+      // no clock the room stalled permanently with no recovery path other
+      // than everyone leaving.
+      //
+      // Sweeping first also keeps the client and the server agreeing:
+      // `moveToRoundResult` requires every *remaining* document to have
+      // voted, so the eligible-player predicate below and that guard are
+      // reading the same roster. Same ordering as `_moveToVoting`.
+      await repository.cleanupDisconnectedPlayers(roomCode);
       await repository.moveToRoundResult(roomCode);
       SoundService.transition();
     } on RoomException catch (e) {
+      // A failed attempt is re-armable; a successful one is not.
+      _advanceRequested = false;
       HapticService.error();
       if (context.mounted) {
         BufonFeedback.show(context, _friendlyResultError(e));
@@ -138,10 +157,15 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
     required bool allVoted,
     required String roomCode,
   }) {
-    if (!isHost || !allVoted || _isAdvancing || _autoAdvanceTimer != null) {
+    if (!isHost ||
+        !allVoted ||
+        _isAdvancing ||
+        _advanceRequested ||
+        _autoAdvanceTimer != null) {
       return;
     }
 
+    _advanceRequested = true;
     _autoAdvanceTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
       _autoAdvanceTimer = null;
@@ -191,9 +215,20 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
           );
         }
         final isHost = room.hostId == userId;
-        final allVoted = room.players.every((p) => p.votedFor != null);
+
+        // WP22 / audit B G-1F. Completion is over the players this phase may
+        // wait for. Eligibility is *presence*, not participation: a player
+        // who did not answer still votes, and their vote is still required.
+        //
+        // The ballot below is deliberately NOT filtered the same way. A
+        // dropped player's answer stays votable — `submitVote` accepts any
+        // target with an answer — so narrowing the roster we wait on must not
+        // narrow the cards on offer. Different predicates, different jobs.
+        final eligible = room.players.eligible.toList();
+        final eligibleCount = eligible.length;
+        final votedCount = eligible.where((p) => p.votedFor != null).length;
+        final allVoted = eligibleCount > 0 && votedCount == eligibleCount;
         final hasVoted = currentPlayer.votedFor != null;
-        final votedCount = room.players.where((p) => p.votedFor != null).length;
 
         final shuffledPlayers = List<Player>.from(room.players);
         shuffledPlayers.removeWhere(
@@ -368,12 +403,14 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
                         ? '¡Voto enviado!'
                         : 'Toca una respuesta para votar',
                     live: hasVoted,
-                    progress:
-                        room.players.where((p) => p.votedFor != null).length /
-                        room.players.length,
+                    // Denominator is the eligible roster too, so the panel
+                    // never reports waiting on somebody who has dropped.
+                    progress: eligibleCount == 0
+                        ? 0
+                        : votedCount / eligibleCount,
                     message:
-                        '${GameCopy.voteProgress(votedCount, room.players.length)}\n'
-                        '${GameCopy.voteWaiting(votedCount, room.players.length)}',
+                        '${GameCopy.voteProgress(votedCount, eligibleCount)}\n'
+                        '${GameCopy.voteWaiting(votedCount, eligibleCount)}',
                   ),
                   const SizedBox(height: AppSpacing.md),
 

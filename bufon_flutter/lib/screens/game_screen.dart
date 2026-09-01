@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_phase.dart';
+import '../models/player.dart';
 import '../providers/game_providers.dart';
 import '../core/telemetry/game_telemetry_service.dart';
 import '../core/exceptions.dart';
@@ -40,6 +41,21 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   Timer? _autoAdvanceTimer;
   int _remainingSeconds = 90;
   bool _isAdvancing = false;
+
+  /// WP22. One completed transition attempt per screen.
+  ///
+  /// `_autoAdvanceTimer` alone was not enough: it nulls itself inside its own
+  /// callback, and `_moveToVoting`'s `finally` calls `setState`, so the
+  /// rebuild that follows a *successful* advance re-armed the timer and fired
+  /// a second transition two seconds later. The server rejected it with
+  /// `INVALID_PHASE`, so the room was never harmed — but the client was
+  /// asking again for something it had already achieved, and audit B §9.3
+  /// asks for "auto-advance fires once, not repeatedly".
+  ///
+  /// Cleared only on failure, so a genuine transient error can still be
+  /// retried by the next trigger. On success it stays set and the screen is
+  /// replaced by the phase change anyway.
+  bool _advanceRequested = false;
 
   @override
   void initState() {
@@ -149,6 +165,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       );
       SoundService.transition();
     } on GameException catch (e) {
+      // A failed attempt is re-armable; a successful one is not.
+      _advanceRequested = false;
       HapticService.error();
       if (mounted) {
         BufonFeedback.show(context, _friendlyPhaseError(e));
@@ -168,10 +186,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     if (!isHost ||
         !shouldAdvance ||
         _isAdvancing ||
+        _advanceRequested ||
         _autoAdvanceTimer != null) {
       return;
     }
 
+    _advanceRequested = true;
     _autoAdvanceTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
       _autoAdvanceTimer = null;
@@ -197,6 +217,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         return 'Todavía falta gente por responder.';
       case 'NO_ANSWERS_SUBMITTED':
         return 'Nadie respondió. Denle otra oportunidad al caos.';
+      // WP22: with a single answer the ballot would hold one card its own
+      // author is forbidden to pick, so voting could never end. The round
+      // stays open instead — which is what this copy asks for.
+      case 'NOT_ENOUGH_ANSWERS':
+        return 'Falta al menos una respuesta más para poder votar.';
       case 'INVALID_PHASE':
         return 'La ronda ya cambió.';
       case 'ROOM_NOT_FOUND':
@@ -241,15 +266,35 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           return const Scaffold(body: Center(child: BufonLoader()));
         }
         final isHost = room.hostId == userId;
-        final allAnswered = room.players.every((p) => p.currentAnswer != null);
-        final hasAnswered = currentPlayer.currentAnswer != null;
-        final answeredCount = room.players
-            .where((p) => p.currentAnswer != null)
-            .length;
+
+        // WP22 / audit B G-1F. Completion is measured over the players this
+        // phase may legitimately wait for, not over every document in the
+        // subcollection. One player who had dropped or backgrounded used to
+        // make `allAnswered` permanently false, which is why the room burned
+        // the whole clock every time — the testers' "we had to wait for the
+        // timer" complaint, with a cause that was never the timer.
+        final eligible = room.players.eligible.toList();
+        final eligibleCount = eligible.length;
+        final answeredCount = eligible.where((p) => p.hasAnswered).length;
+        final allAnswered = eligibleCount > 0 && answeredCount == eligibleCount;
+        final hasAnswered = currentPlayer.hasAnswered;
+
+        // WP22 / audit B G-1G + G-1H. Two answers is what makes a ballot
+        // votable (`RoomRepository.moveToVoting` states why), so the host
+        // does not attempt a transition the guard is certain to reject.
+        //
+        // This is also what ends the zero-answer stranding. The old code
+        // fired every 2 s at expiry, threw NO_ANSWERS_SUBMITTED, toasted the
+        // error and rescheduled itself forever. Now the attempt simply is
+        // not made: the room stays in `answering` with the answer field
+        // live, and the moment a second answer lands `shouldAdvance` turns
+        // true and the round proceeds on its own.
+        final expired = _remainingSeconds <= 0;
+        final canOpenBallot = answeredCount >= 2;
 
         _scheduleAutoVoting(
           isHost: isHost,
-          shouldAdvance: allAnswered || _remainingSeconds <= 0,
+          shouldAdvance: canOpenBallot && (allAnswered || expired),
           roomCode: room.code,
         );
 
@@ -428,12 +473,15 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   const SizedBox(height: AppSpacing.md),
 
                   BufonStatusPanel(
-                    progress: room.players.isEmpty
+                    // Denominator is the eligible roster too. Counting a
+                    // player who has dropped would leave the panel saying
+                    // "falta 1 bufón" about somebody nothing is waiting for.
+                    progress: eligibleCount == 0
                         ? 0
-                        : answeredCount / room.players.length,
+                        : answeredCount / eligibleCount,
                     message:
-                        '${GameCopy.answerProgress(answeredCount, room.players.length)}\n'
-                        '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
+                        '${GameCopy.answerProgress(answeredCount, eligibleCount)}\n'
+                        '${GameCopy.answerWaiting(answeredCount, eligibleCount)}',
                     // Announced once, when the last answer lands — not on
                     // every player's answer, which is up to eight
                     // announcements a round, and not on the progress bar's
@@ -443,8 +491,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                     // re-announcing the same state.
                     statusLabel: allAnswered
                         ? 'Todos respondieron'
-                        : '${GameCopy.answerProgress(answeredCount, room.players.length)}. '
-                              '${GameCopy.answerWaiting(answeredCount, room.players.length)}',
+                        : '${GameCopy.answerProgress(answeredCount, eligibleCount)}. '
+                              '${GameCopy.answerWaiting(answeredCount, eligibleCount)}',
                     live: allAnswered,
                   ),
                   const SizedBox(height: AppSpacing.md),

@@ -40,6 +40,19 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
   int _revealStage = 0;
   final List<Timer> _revealTimers = [];
 
+  /// In-flight guard for [_nextRound].
+  ///
+  /// WP22 / audit B **G-2F**, reconciled as **R-13**. Its two siblings —
+  /// `game_screen._moveToVoting` and `voting_screen._moveToResults` — have
+  /// always had this flag; the round-result CTA never did. A double tap
+  /// therefore ran `_advanceRound` twice: two question draws (one of which is
+  /// discarded, so a question is silently consumed from the round's history
+  /// without ever being shown) and two `currentRound + 1` writes off the same
+  /// stale snapshot. The phase transitions themselves are transaction-guarded,
+  /// but `_advanceRound`'s non-final branch is a whole-document `updateRoom`,
+  /// which is not.
+  bool _isAdvancing = false;
+
   /// Drives the "mirilla" mask (`BRAND PHYSICS`: "el reveal como mirilla").
   /// The keyhole cut into the isotype's hat bells means "this holds a secret
   /// until it decides to reveal it", which is literally this screen's job.
@@ -97,6 +110,9 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
   }
 
   Future<void> _nextRound(String roomCode) async {
+    if (_isAdvancing) return;
+    setState(() => _isAdvancing = true);
+
     // This advances the whole room for every player, so a failure here
     // strands the match. It previously had no catch at all: the exception
     // escaped into the zone and would now be reported as a fatal crash even
@@ -110,6 +126,11 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
         error: e,
         stackTrace: stackTrace,
       );
+    } finally {
+      // `mounted` matters here in a way it does not for the siblings: the
+      // successful path navigates away, so this state object is commonly
+      // disposed before the flag is cleared.
+      if (mounted) setState(() => _isAdvancing = false);
     }
   }
 
@@ -355,7 +376,10 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
                         text: room.currentRound >= room.totalRounds
                             ? 'Coronar al BUFÓN'
                             : 'Soltar la siguiente',
-                        onPressed: () => _nextRound(room.code),
+                        onPressed: _isAdvancing
+                            ? null
+                            : () => _nextRound(room.code),
+                        isLoading: _isAdvancing,
                       )
                     else
                       Container(
