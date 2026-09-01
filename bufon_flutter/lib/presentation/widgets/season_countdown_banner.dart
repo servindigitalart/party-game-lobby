@@ -8,6 +8,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../providers/season_providers.dart';
 import '../../services/haptic_service.dart';
+import '../navigation/page_transitions.dart';
 import '../screens/season_details_screen.dart';
 
 class SeasonCountdownBanner extends ConsumerWidget {
@@ -70,12 +71,8 @@ class SeasonCountdownBanner extends ConsumerWidget {
 
         void openSeason() {
           HapticService.lightImpact();
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SeasonDetailsScreen(season: season),
-            ),
-          );
+          // WP26 / R-34, BP X2 — see `lobby_screen`.
+          context.pushFadeSlide(SeasonDetailsScreen(season: season));
         }
 
         return Semantics(
@@ -97,15 +94,15 @@ class SeasonCountdownBanner extends ConsumerWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Color(season.themeColor).withValues(alpha: 0.2),
-                    Color(season.themeColor).withValues(alpha: 0.1),
+                    season.accent.color.withValues(alpha: 0.2),
+                    season.accent.color.withValues(alpha: 0.1),
                   ],
                 ),
-                border: Border.all(color: Color(season.themeColor), width: 2),
+                border: Border.all(color: season.accent.color, width: 2),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(season.themeColor).withValues(alpha: 0.3),
+                    color: season.accent.color.withValues(alpha: 0.3),
                     blurRadius: 10,
                   ),
                 ],
@@ -117,11 +114,11 @@ class SeasonCountdownBanner extends ConsumerWidget {
                     height: 48,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Color(season.themeColor).withValues(alpha: 0.3),
+                      color: season.accent.color.withValues(alpha: 0.3),
                     ),
                     child: Icon(
                       Icons.emoji_events,
-                      color: Color(season.themeColor),
+                      color: season.accent.color,
                       size: 28,
                     ),
                   ),
@@ -147,7 +144,7 @@ class SeasonCountdownBanner extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right, color: Color(season.themeColor)),
+                  Icon(Icons.chevron_right, color: season.accent.color),
                 ],
               ),
             ),

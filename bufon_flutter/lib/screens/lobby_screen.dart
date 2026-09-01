@@ -172,8 +172,11 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     } on MonetizationException catch (e) {
       if (e.code == 'ROOM_LOCKED' && context.mounted) {
         // Show paywall screen
-        final unlocked = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(builder: (_) => PaywallScreen(roomCode: roomCode)),
+        // WP26 / R-34, BP X2. One of the three routes still on Flutter's
+        // default transition; the fade-slide language is already adopted at
+        // sixteen other sites.
+        final unlocked = await context.pushFadeSlide<bool>(
+          PaywallScreen(roomCode: roomCode),
         );
 
         // If unlocked, retry starting the game

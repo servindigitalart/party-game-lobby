@@ -28,11 +28,6 @@
 	<string>ca-app-pub-8727546001742642~5911765200</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

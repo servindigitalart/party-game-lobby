@@ -85,18 +85,18 @@ class _SeasonDetailsScreenState extends ConsumerState<SeasonDetailsScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(widget.season.themeColor).withValues(alpha: 0.3),
-              Color(widget.season.themeColor).withValues(alpha: 0.1),
+              widget.season.accent.color.withValues(alpha: 0.3),
+              widget.season.accent.color.withValues(alpha: 0.1),
             ],
           ),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Color(widget.season.themeColor), width: 2),
+          border: Border.all(color: widget.season.accent.color, width: 2),
         ),
         child: Column(
           children: [
             Icon(
               Icons.emoji_events,
-              color: Color(widget.season.themeColor),
+              color: widget.season.accent.color,
               size: 64,
             ),
             const SizedBox(height: AppSpacing.md),

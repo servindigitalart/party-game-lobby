@@ -1,11 +1,17 @@
 // models/season.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/theme/season_accent.dart';
 
 class Season {
   final String id;
   final String name;
   final DateTime startDate;
   final DateTime endDate;
+  /// The raw stored value. **Read [accent], not this.**
+  ///
+  /// WP26 / R-32: this is an unconstrained `int` from Firestore, and painting
+  /// with it directly is the colour-injection path F7 closes. It is kept so
+  /// `toFirestore` round-trips without a schema change, and nothing else.
   final int themeColor;
   final bool isActive;
   final DateTime createdAt;
@@ -19,6 +25,9 @@ class Season {
     required this.isActive,
     required this.createdAt,
   });
+
+  /// The season's colour, constrained to the design system (WP26 / R-32).
+  SeasonAccent get accent => SeasonAccent.fromThemeColor(themeColor);
 
   bool get isEnded => DateTime.now().isAfter(endDate);
 

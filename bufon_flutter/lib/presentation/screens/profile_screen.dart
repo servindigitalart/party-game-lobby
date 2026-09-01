@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/bufon_phase.dart';
+import '../navigation/page_transitions.dart';
 import '../widgets/bufon_feedback.dart';
 import '../widgets/bufon_loader.dart';
 import '../widgets/bufon_placeholder.dart';
@@ -87,12 +88,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 return;
               }
               HapticService.lightImpact();
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      ProfilePublicScreen(userId: userId, isOwnProfile: true),
-                ),
+              // WP26 / R-34, BP X2 — see `lobby_screen`.
+              context.pushFadeSlide(
+                ProfilePublicScreen(userId: userId, isOwnProfile: true),
               );
             },
           ),

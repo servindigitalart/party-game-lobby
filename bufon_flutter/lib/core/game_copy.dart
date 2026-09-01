@@ -55,6 +55,18 @@ class GameCopy {
   // reflex is not asking to abandon a game their friends are still in.
   static const backToHome = 'Volver al Inicio';
 
+  // WP26 / R-38 · BP Part IV §1(d): *"typing a code then pressing 'Crear Sala' silently
+  // discards it."* It no longer does — it says so, on the field it would have
+  // thrown away.
+  static const codeIgnoredWhenCreating =
+      '¿Querías unirte? Usa "Unirse a Sala", o borra el código para crear una '
+      'sala nueva.';
+
+  // WP26 / R-38, BP P9. The own-card was muted and unexplained; the only thing
+  // that said why lived inside a `Semantics` string, so a sighted player was
+  // told nothing.
+  static const yourAnswerLabel = 'Tu respuesta';
+
   static const leaveRoomTitle = '¿Salir de la sala?';
   static const leaveRoomBody =
       'Vas a dejar la partida y volver al inicio. Los demás siguen jugando '

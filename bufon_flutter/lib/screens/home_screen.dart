@@ -32,6 +32,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _codeController = TextEditingController();
   bool _isLoading = false;
 
+  /// WP26 / R-38. The one message that belongs on the field itself rather
+  /// than in a transient toast: the room code this screen used to discard
+  /// without a word.
+  String? _codeError;
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +54,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _createRoom() async {
     if (_nameController.text.trim().isEmpty) {
       _showError('Por favor ingresa tu nombre');
+      return;
+    }
+
+    // WP26 / R-38, and the case the item actually cites — BP Part IV §1(d):
+    // *"typing a code then pressing 'Crear Sala' silently discards it."*
+    // It no longer does. The message lands on the field that would have been
+    // thrown away, one tap from the action the player almost certainly meant.
+    //
+    // The two empty-field guards above and below deliberately keep
+    // `_showError`: WP11 adopted `BufonFeedback` as Home's one reporting path
+    // and `registered_feedback_adoption_test` probes it through exactly those
+    // guards. R-38 names the silent discard, not the reporting mechanism.
+    //
+    // (`bufon_component_primitives_test` greps this file's source for
+    // hand-rolled toast types, so the primitive's name is the only one that
+    // may appear here.)
+    if (_codeController.text.trim().isNotEmpty) {
+      setState(() => _codeError = GameCopy.codeIgnoredWhenCreating);
       return;
     }
 
@@ -273,11 +296,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         const SizedBox(height: AppSpacing.md),
                         TextField(
                           controller: _codeController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Código de sala',
+                            errorText: _codeError,
                           ),
                           textCapitalization: TextCapitalization.characters,
                           enabled: !_isLoading,
+                          // Clears as soon as the player acts on it, so the
+                          // message never outlives the problem.
+                          onChanged: (_) {
+                            if (_codeError != null) {
+                              setState(() => _codeError = null);
+                            }
+                          },
                         ),
                         const SizedBox(height: AppSpacing.md),
                         AnimatedPrimaryButton(

@@ -370,8 +370,15 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
                                     ),
                                   );
                                 },
+                                // WP26 / R-38, BP P9: the own card is muted and
+                                // unvotable, and until now the only thing that
+                                // said why lived inside a `Semantics` string —
+                                // so a sighted player was told nothing at all.
                                 child: GameCard(
-                                  text: player.currentAnswer ?? 'Sin respuesta',
+                                  text: player.id == userId
+                                      ? '${GameCopy.yourAnswerLabel}: '
+                                            '${player.currentAnswer ?? "Sin respuesta"}'
+                                      : player.currentAnswer ?? 'Sin respuesta',
                                   isSelected: isSelected,
                                   isDisabled: !canVote,
                                   semanticLabel: player.id == userId

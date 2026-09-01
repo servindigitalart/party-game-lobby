@@ -1,3 +1,4 @@
+import 'package:bufon_flutter/core/game_copy.dart';
 import 'package:bufon_flutter/main.dart';
 import 'package:bufon_flutter/models/game_phase.dart';
 import 'package:bufon_flutter/models/player.dart';
@@ -502,7 +503,15 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
       expect(tester.takeException(), isNull);
-      expect(find.text('Una respuesta graciosa'), findsOneWidget);
+      // WP26 / R-38 (BP P9) prefixes the viewer's *own* card with a visible
+      // "Tu respuesta" label — the muted card used to explain itself only
+      // inside a `Semantics` string, so a sighted player was told nothing.
+      // This viewer is `p2`, whose own answer this is. Exact match, reading
+      // the constant, so the assertion cannot drift from the copy.
+      expect(
+        find.text('${GameCopy.yourAnswerLabel}: Una respuesta graciosa'),
+        findsOneWidget,
+      );
     });
   });
 
