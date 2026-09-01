@@ -364,6 +364,11 @@ class RoomRepository {
           'currentQuestionText': questionText,
           'currentRound': 1,
           'roundStartTime': DateTime.now().toIso8601String(),
+          // WP23 / R-18: the history accumulates rather than resetting. The
+          // lobby used to call `getRandomQuestion([])` on every new game,
+          // which is the mechanism behind the 80.6 % repeat rate across two
+          // consecutive games in the same room.
+          'usedQuestionIds': [...room.usedQuestionIds, questionId],
         });
       });
     });
@@ -451,6 +456,64 @@ class RoomRepository {
         transaction.update(roomRef, {
           'phase': GamePhase.voting.name,
           'roundStartTime': DateTime.now().toIso8601String(),
+        });
+      });
+    });
+  }
+
+  /// Open the next round with [questionId], from `roundResult`.
+  ///
+  /// WP23 / audit B **X-3**. This path used to be
+  /// `clearRoundData` + `updateRoom(room.copyWith(...))`, and `updateRoom`
+  /// writes the **whole document** (`room.toJson()`) built from a snapshot
+  /// the client read earlier. Two problems, both closed here:
+  ///
+  /// * **Clobber.** Every field the client did not intend to change was
+  ///   rewritten with a stale value — including `gamesPlayedToday`,
+  ///   `adUnlocksRemaining` and `nightPassExpiresAt`, all of which the server
+  ///   and the `verifyNightPass` function own. A concurrent server write
+  ///   between the read and the write was silently overwritten, and because
+  ///   `firestore.rules` guards exactly those fields the round advance would
+  ///   then be **rejected** rather than merely wrong.
+  /// * **Not transactional.** `currentRound + 1` was computed on the client
+  ///   from that same stale snapshot, so two advances racing off one
+  ///   snapshot both wrote the same number. R-13's in-flight flag (WP22)
+  ///   closes the double *tap*; the phase precondition below closes the
+  ///   double *write*, at the layer that can actually guarantee it.
+  ///
+  /// Writes only the six fields a round change owns. `firestore.rules` needs
+  /// no change — X-3 confirmed it, and the update rule constrains only the
+  /// monetisation and host fields this never touches.
+  Future<void> advanceToNextRound({
+    required String roomCode,
+    required String questionId,
+    required String questionText,
+  }) async {
+    final roomRef = _firestore.collection('rooms').doc(roomCode);
+
+    await _transaction('advance_round', () async {
+      return _firestore.runTransaction((transaction) async {
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
+
+        final room = Room.fromJson(roomSnapshot.data()!);
+        if (room.phase != GamePhase.roundResult) {
+          throw RoomException(
+            'Cannot start a round from phase ${room.phase.name}',
+            code: 'INVALID_PHASE',
+          );
+        }
+
+        transaction.update(roomRef, {
+          'phase': GamePhase.answering.name,
+          'currentQuestionId': questionId,
+          'currentQuestionText': questionText,
+          // From the transaction's own read, never from the caller.
+          'currentRound': room.currentRound + 1,
+          'roundStartTime': DateTime.now().toIso8601String(),
+          'usedQuestionIds': [...room.usedQuestionIds, questionId],
         });
       });
     });

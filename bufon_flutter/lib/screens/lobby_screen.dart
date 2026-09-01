@@ -141,14 +141,18 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         await questionService.loadQuestions();
       }
 
-      // Get first question
-      final question = questionService.getRandomQuestion([]);
-      ref.read(usedQuestionIdsProvider.notifier).state = [question.id];
-
       // Get current room
       final roomAsync = ref.read(roomStreamProvider);
       final room = roomAsync.value;
       if (room == null) return;
+
+      // WP23 / R-18. This used to be `getRandomQuestion([])` — an empty list,
+      // every single game — so a room's second game drew from the full corpus
+      // again and could re-ask what the first game had just asked. That is the
+      // 80.6 %-over-two-games repeat rate the package exists to reduce. The
+      // room's own history is the authority now, and `startFirstRound` appends
+      // to it inside its transaction.
+      final question = questionService.getRandomQuestion(room.usedQuestionIds);
 
       await repository.startFirstRound(
         roomCode: room.code,

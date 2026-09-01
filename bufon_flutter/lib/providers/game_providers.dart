@@ -54,5 +54,15 @@ final roomStreamProvider = StreamProvider.autoDispose<Room?>((ref) {
   return repository.watchRoom(roomCode);
 });
 
-// Used question IDs
-final usedQuestionIdsProvider = StateProvider<List<String>>((ref) => []);
+// WP23 / R-18 removed `usedQuestionIdsProvider`.
+//
+// It was a `StateProvider<List<String>>` holding the room's question history
+// in the *host device's memory*. That made the history host-local (a promoted
+// host drew from its own empty list and could re-ask a used question) and
+// per-game (the lobby reset it to `[]` on every new game, which is what
+// produced the 80.6 % repeat rate across two consecutive games in one room).
+//
+// The history now lives on the room document as `Room.usedQuestionIds`, where
+// it has one owner, survives host handover and process death, and accumulates
+// across the games a room plays. Nothing replaces this provider — the room
+// stream already carries the value.

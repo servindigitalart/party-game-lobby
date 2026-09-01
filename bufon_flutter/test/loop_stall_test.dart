@@ -98,6 +98,19 @@ class _RecordingRepository extends RoomRepository {
   @override
   Future<void> updateRoom(Room room) async =>
       calls.add('updateRoom(round: ${room.currentRound})');
+
+  /// WP23 moved the round advance off `updateRoom`'s whole-document write and
+  /// onto this transactional, field-level method (audit B X-3). The invariant
+  /// R-13 guards is unchanged — one advance per double tap — so the assertion
+  /// below simply follows the call to where it now lives. Without the
+  /// override the real implementation would reach the empty fake and throw
+  /// `ROOM_NOT_FOUND`, which would make the test pass by recording nothing.
+  @override
+  Future<void> advanceToNextRound({
+    required String roomCode,
+    required String questionId,
+    required String questionText,
+  }) async => calls.add('advanceToNextRound($questionId)');
 }
 
 /// `QuestionService` reads `assets/questions.json` through `rootBundle` and
@@ -561,7 +574,7 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
 
       expect(
-        repository.calls.where((c) => c.startsWith('updateRoom')).length,
+        repository.calls.where((c) => c.startsWith('advanceToNextRound')).length,
         1,
         reason: 'the round advanced twice off one snapshot',
       );

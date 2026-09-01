@@ -98,5 +98,405 @@
     "id": "q020",
     "text": "¿Cuál es la mentira más tonta que has dicho y te han creído?",
     "pack": "DI LA NETA"
+  },
+  {
+    "id": "q021",
+    "text": "Si pudieras ser famoso por algo ridículo, ¿qué sería?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q022",
+    "text": "¿Quién es más propenso a llorar con una película de Disney?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q023",
+    "text": "¿Qué harías si fueras invisible por un día?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q024",
+    "text": "¿Cuál es el peor consejo que has recibido?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q025",
+    "text": "¿Quién es más propenso a tener un ataque de risa incontrolable?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q026",
+    "text": "Si pudieras hablar con tu 'yo' de hace 5 años, ¿qué le dirías?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q027",
+    "text": "¿Qué es algo que todo el mundo ama pero tú odias?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q028",
+    "text": "¿Quién es más propenso a intentar un reto viral de internet?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q029",
+    "text": "Si los objetos de tu cuarto pudieran hablar, ¿qué diría el más chismoso?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q030",
+    "text": "¿Cuál es la excusa más creativa que has usado para no hacer la tarea?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q031",
+    "text": "¿Quién es más propenso a adoptar 20 gatos?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q032",
+    "text": "Si pudieras eliminar una palabra del diccionario, ¿cuál sería?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q033",
+    "text": "¿Cuál es la combinación de comida más rara que te gusta?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q034",
+    "text": "¿Quién es más propenso a hablar solo?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q035",
+    "text": "Si tuvieras un robot personal, ¿cuál sería su primera tarea?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q036",
+    "text": "¿Qué personaje de ficción sería tu mejor amigo?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q037",
+    "text": "¿Quién es más propenso a sobrevivir un apocalipsis zombie?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q038",
+    "text": "¿Cuál es la película que puedes ver mil veces sin aburrirte?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q039",
+    "text": "Si pudieras tener la voz de cualquier cantante, ¿quién sería?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q040",
+    "text": "¿Quién es más propenso a tomarse una selfie en un funeral?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q041",
+    "text": "¿Cuál es el peor regalo que has recibido?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q042",
+    "text": "Si tuvieras que describir tu estilo con tres palabras, ¿cuáles serían?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q043",
+    "text": "¿Quién es más propenso a gastar todo su dinero en algo inútil?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q044",
+    "text": "Si fueras un meme, ¿cuál serías?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q045",
+    "text": "¿Qué es lo más estúpido por lo que has discutido con alguien?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q046",
+    "text": "¿Quién es más propenso a hablar con acento falso para divertirse?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q047",
+    "text": "Si pudieras fundar un país, ¿cuál sería la primera regla?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q048",
+    "text": "¿Cuál es el sonido que más odias en el mundo?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q049",
+    "text": "¿Quién es más propenso a enamorarse de un personaje ficticio?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q050",
+    "text": "Si tuvieras que llevar un disfraz todos los días durante un año, ¿cuál elegirías?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q051",
+    "text": "¿Qué superhéroe está más sobrevalorado?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q052",
+    "text": "¿Quién es más propenso a contar el final de una película?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q053",
+    "text": "Si pudieras ser un experto instantáneo en cualquier cosa, ¿qué elegirías?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q054",
+    "text": "¿Cuál es la cosa más extraña que has buscado en Google?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q055",
+    "text": "¿Quién es más propenso a crear un drama de la nada?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q056",
+    "text": "¿Qué harías si te despertaras con la capacidad de entender a los animales?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q057",
+    "text": "¿Cuál es tu talento secreto y completamente inútil?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q058",
+    "text": "¿Quién es más propenso a tropezar subiendo las escaleras?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q059",
+    "text": "Si la música de tu vida se detuviera de repente, ¿qué canción estaba sonando?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q060",
+    "text": "¿Qué es lo más loco que has hecho por una apuesta?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q061",
+    "text": "¿Quién es más propenso a comerse la pizza con tenedor y cuchillo?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q062",
+    "text": "Si pudieras tener cualquier animal exótico como mascota, ¿cuál sería?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q063",
+    "text": "¿Cuál es la costumbre familiar más rara que tienes?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q064",
+    "text": "¿Quién es más propenso a olvidar el cumpleaños de su mejor amigo?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q065",
+    "text": "Si pudieras hacer una ley que todos tuvieran que obedecer, ¿cuál sería?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q066",
+    "text": "¿Qué es algo que te da mucho cringe?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q067",
+    "text": "¿Quién es más propenso a buscar su propio nombre en Google?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q068",
+    "text": "¿Cuál es la peor pesadilla que has tenido?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q069",
+    "text": "Si tuvieras que reemplazar tus manos con objetos, ¿qué objetos serían?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q070",
+    "text": "¿Quién es más propenso a empezar un negocio que fracasará épicamente?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q071",
+    "text": "¿Cuál es tu emoji más usado?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q072",
+    "text": "Si te arrestaran sin explicación, ¿qué pensarían tus amigos que hiciste?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q073",
+    "text": "¿Quién es más propenso a responder 'jajaja' sin haberse reído?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q074",
+    "text": "¿Qué es algo que finges que te gusta para encajar?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q075",
+    "text": "Si pudieras vivir dentro de un videojuego, ¿cuál sería?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q076",
+    "text": "¿Quién es más propenso a dar un discurso en una boda estando borracho?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q077",
+    "text": "¿Cuál es la teoría más loca que tienes sobre el universo?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q078",
+    "text": "¿Qué harías con 15 minutos de fama?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q079",
+    "text": "¿Quién es más propenso a usar calcetines con sandalias?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q080",
+    "text": "Si pudieras oler a una sola cosa por el resto de tu vida, ¿a qué olerías?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q081",
+    "text": "¿Cuál es el 'dato curioso' más inútil que sabes?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q082",
+    "text": "¿Quién es más propenso a stalkear a su ex en redes sociales?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q083",
+    "text": "Si pudieras elegir a tus padres de un catálogo de personajes de ficción, ¿a quiénes elegirías?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q084",
+    "text": "¿Qué es lo más infantil que todavía haces?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q085",
+    "text": "¿Quién es más propenso a reírse de sus propios chistes?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q086",
+    "text": "Si tuvieras que comunicarte solo con emojis por 24 horas, ¿sobrevivirías?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q087",
+    "text": "¿Cuál es la mayor metida de pata que has tenido en un chat grupal?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q088",
+    "text": "¿Quién es más propenso a intentar cocinar algo de TikTok y quemar la cocina?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q089",
+    "text": "Si tuvieras un eslogan personal, ¿cuál sería?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q090",
+    "text": "¿Qué es algo que está de moda ahora pero que odiarás en 5 años?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q091",
+    "text": "¿Quién es más propenso a ser el protagonista de un reality show?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q092",
+    "text": "Si pudieras escuchar los pensamientos de una persona por un día, ¿a quién elegirías?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q093",
+    "text": "¿Cuál es el objeto más extraño que tienes en tu mochila o bolso ahora mismo?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q094",
+    "text": "¿Quién es más propenso a poner la leche antes que el cereal?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q095",
+    "text": "Si pudieras revivir una tendencia de moda del pasado, ¿cuál sería?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q096",
+    "text": "¿Qué canción te pone automáticamente de buen humor?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q097",
+    "text": "¿Quién es más propenso a ser un 'meme' andante?",
+    "pack": "ALGUIEN DE AQUÍ"
+  },
+  {
+    "id": "q098",
+    "text": "Si tuvieras que crear un nuevo día festivo, ¿qué celebraríamos?",
+    "pack": "¿QUÉ PEDO?"
+  },
+  {
+    "id": "q099",
+    "text": "¿Cuál es el nombre más ridículo que le pondrías a un hijo?",
+    "pack": "DI LA NETA"
+  },
+  {
+    "id": "q100",
+    "text": "¿Quién es más propenso a responder esta pregunta de forma demasiado honesta?",
+    "pack": "ALGUIEN DE AQUÍ"
   }
 ]

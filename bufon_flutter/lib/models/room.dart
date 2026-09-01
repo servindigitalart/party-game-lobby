@@ -17,6 +17,25 @@ class Room {
   final int roundDuration; // in seconds
   final DateTime createdAt;
 
+  /// Every question this room has already asked.
+  ///
+  /// WP23 / audit B **G-2E**, reconciled as **R-18**. The history used to be
+  /// `usedQuestionIdsProvider`, a `StateProvider<List<String>>` living in the
+  /// host's memory. Two consequences, both verified:
+  ///
+  /// * it was **host-local**, so when `cleanupDisconnectedPlayers` promoted a
+  ///   new host mid-game that device drew from its own — usually empty — list
+  ///   and could re-ask a question the room had already used;
+  /// * it was **reset every game**, because the lobby always called
+  ///   `getRandomQuestion([])`, which is what produced the 80.6 % repeat rate
+  ///   across two consecutive games.
+  ///
+  /// On the room it is one shared list with one owner, it survives host
+  /// handover and process death, and it **accumulates across games in the
+  /// same room** — which is the scope WP23's objective states, since the rate
+  /// it exists to reduce is measured *"over two games"*.
+  final List<String> usedQuestionIds;
+
   // Room-based monetization fields
   final int gamesPlayedToday;
   final int adUnlocksRemaining;
@@ -33,7 +52,11 @@ class Room {
     this.currentRound = 0,
     this.totalRounds = 5,
     this.roundStartTime,
-    this.roundDuration = 90,
+    // WP23 / PD-1. The players asked for 60 s and the owner decided it; audit
+    // B X-1's ordering constraint — never shorten the clock before the
+    // deadlocks are closed — was satisfied by WP22.
+    this.roundDuration = 60,
+    this.usedQuestionIds = const [],
     DateTime? createdAt,
     this.gamesPlayedToday = 0,
     this.adUnlocksRemaining = 0,
@@ -52,6 +75,7 @@ class Room {
     'totalRounds': totalRounds,
     'roundStartTime': roundStartTime?.toIso8601String(),
     'roundDuration': roundDuration,
+    'usedQuestionIds': usedQuestionIds,
     'createdAt': createdAt.toIso8601String(),
     'gamesPlayedToday': gamesPlayedToday,
     'adUnlocksRemaining': adUnlocksRemaining,
@@ -77,7 +101,16 @@ class Room {
       roundStartTime: json['roundStartTime'] != null
           ? DateTime.parse(json['roundStartTime'] as String)
           : null,
-      roundDuration: json['roundDuration'] as int? ?? 90,
+      // PD-1 note, carried from the reconciliation: a default change reaches
+      // **new rooms only**. A room document written before WP23 carries its
+      // own `roundDuration: 90` and keeps it for its lifetime — this fallback
+      // fires only for a document that never had the field at all.
+      roundDuration: json['roundDuration'] as int? ?? 60,
+      usedQuestionIds:
+          (json['usedQuestionIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
@@ -101,6 +134,7 @@ class Room {
     int? totalRounds,
     DateTime? roundStartTime,
     int? roundDuration,
+    List<String>? usedQuestionIds,
     DateTime? createdAt,
     int? gamesPlayedToday,
     int? adUnlocksRemaining,
@@ -117,6 +151,7 @@ class Room {
     totalRounds: totalRounds ?? this.totalRounds,
     roundStartTime: roundStartTime ?? this.roundStartTime,
     roundDuration: roundDuration ?? this.roundDuration,
+    usedQuestionIds: usedQuestionIds ?? this.usedQuestionIds,
     createdAt: createdAt ?? this.createdAt,
     gamesPlayedToday: gamesPlayedToday ?? this.gamesPlayedToday,
     adUnlocksRemaining: adUnlocksRemaining ?? this.adUnlocksRemaining,

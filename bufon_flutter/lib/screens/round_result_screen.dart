@@ -141,6 +141,16 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
     if (room == null) return;
 
     final questionService = ref.read(questionServiceProvider);
+
+    // WP23 / audit B G-2E. A host promoted mid-game by
+    // `cleanupDisconnectedPlayers` reaches this path with its own
+    // `QuestionService`, which never loaded the corpus because it was never
+    // the device that passed through the lobby. Without this the promoted
+    // host draws from an empty list.
+    if (questionService.getAllQuestions().isEmpty) {
+      await questionService.loadQuestions();
+    }
+
     final roomAsync = ref.read(roomStreamProvider);
     final currentRoom = roomAsync.value;
     if (currentRoom == null) return;
@@ -156,22 +166,24 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
 
     await repository.clearRoundData(roomCode);
 
-    final usedIds = ref.read(usedQuestionIdsProvider);
-    final question = questionService.getRandomQuestion(usedIds);
-    ref.read(usedQuestionIdsProvider.notifier).state = [
-      ...usedIds,
-      question.id,
-    ];
-
-    final updatedRoom = currentRoom.copyWith(
-      phase: GamePhase.answering,
-      currentQuestionId: question.id,
-      currentQuestionText: question.text,
-      currentRound: currentRoom.currentRound + 1,
-      roundStartTime: DateTime.now(),
+    // WP23 / R-18: the room's history, not this device's. The old
+    // `usedQuestionIdsProvider` lived in the host's memory, so a host handover
+    // handed the next draw to a device with a different — usually empty —
+    // list, and the room could re-ask a question it had already used.
+    final question = questionService.getRandomQuestion(
+      currentRoom.usedQuestionIds,
     );
 
-    await repository.updateRoom(updatedRoom);
+    // WP23 / audit B X-3: a transactional, field-level write replaces
+    // `updateRoom(room.copyWith(...))`, which rewrote the whole document from
+    // a stale snapshot — including the monetisation fields the server owns —
+    // and computed `currentRound + 1` on the client. Both now happen inside
+    // the transaction, from its own read.
+    await repository.advanceToNextRound(
+      roomCode: roomCode,
+      questionId: question.id,
+      questionText: question.text,
+    );
   }
 
   @override

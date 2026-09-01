@@ -39,7 +39,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   final _answerController = TextEditingController();
   Timer? _timer;
   Timer? _autoAdvanceTimer;
-  int _remainingSeconds = 90;
+  /// Placeholder for the single frame before the room snapshot arrives.
+  ///
+  /// `_startTimer` recomputes this from `room.roundStartTime` and
+  /// `room.roundDuration` on the first post-frame callback, so this value is
+  /// never used for a decision — it is kept in step with
+  /// `Room.roundDuration`'s default (WP23 / PD-1: 60 s) purely so the first
+  /// painted frame does not show a number the round will never have.
+  int _remainingSeconds = 60;
   bool _isAdvancing = false;
 
   /// WP22. One completed transition attempt per screen.
