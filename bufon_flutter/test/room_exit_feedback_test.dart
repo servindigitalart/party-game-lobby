@@ -1,6 +1,7 @@
 // test/room_exit_feedback_test.dart
 
 import 'package:bufon_flutter/data/repositories/room_repository.dart';
+import 'package:bufon_flutter/core/game_copy.dart';
 import 'package:bufon_flutter/models/game_phase.dart';
 import 'package:bufon_flutter/models/player.dart';
 import 'package:bufon_flutter/models/room.dart';
@@ -21,6 +22,14 @@ import 'package:flutter_test/flutter_test.dart';
 /// back to Home. WP12 established that it never arrived: the outgoing route is
 /// disposed when its 250 ms fade completes, and the feedback was scheduled for
 /// 500 ms, by which point the `mounted` guard that protects it is false.
+///
+/// WP25 / R-12 replaced the literal these assertions used to carry. The copy
+/// read "La sala se cerró por desconexión", which audit A H-2 called
+/// accusatory: it blames the player's connection for a room that is actually
+/// deleted when fewer than two active players remain. The assertions now read
+/// the constant from `GameCopy`, so they cannot drift from production, and the
+/// behaviour under test — that the message survives the navigation — is
+/// unchanged.
 ///
 /// These tests drive the real triggers — a room stream that goes null, a
 /// cleanup pass that deletes the room, a player who is no longer in the
@@ -113,7 +122,7 @@ void main() {
     await settleThroughOldBoundary(tester);
 
     expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.text('La sala se cerró por desconexión'), findsOneWidget);
+    expect(find.text(GameCopy.roomClosedTooFewPlayers), findsOneWidget);
   });
 
   testWidgets('B — Lobby: a room stream that goes null explains itself', (
@@ -132,7 +141,7 @@ void main() {
     await settleThroughOldBoundary(tester);
 
     expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.text('La sala se cerró por desconexión'), findsOneWidget);
+    expect(find.text(GameCopy.roomClosedTooFewPlayers), findsOneWidget);
   });
 
   testWidgets('C — Game: a room stream that goes null explains itself', (
@@ -151,7 +160,7 @@ void main() {
     await settleThroughOldBoundary(tester);
 
     expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.text('La sala se cerró por desconexión'), findsOneWidget);
+    expect(find.text(GameCopy.roomClosedTooFewPlayers), findsOneWidget);
   });
 
   testWidgets('D — Game: a player no longer in the roster is told they left', (

@@ -27,7 +27,7 @@ class ConnectionService {
   /// evict a player, so the two views of "disconnected" agree.
   static const int _lostAfterConsecutiveFailures = 2;
 
-  final FirebaseFirestore _firestore;
+  final FirebaseFirestore? _injectedFirestore;
   final GameTelemetryService _telemetry = GameTelemetryService.instance;
   Timer? _heartbeatTimer;
   String? _currentRoomCode;
@@ -37,8 +37,38 @@ class ConnectionService {
   bool _isConnectionLost = false;
   _AppLifecycleObserver? _lifecycleObserver;
 
+  /// Whether the heartbeat is currently considered lost.
+  ///
+  /// WP25 / **R-37**, BP **P4**. This service has run since launch with **no
+  /// UI at all** — the Blueprint's component table records it as
+  /// *"Heartbeat only, no UI"* — so a player whose beats were failing had no
+  /// way to know, and the confusion behind audit A **H-2** had no explanation
+  /// on screen.
+  ///
+  /// A `ValueNotifier` rather than a stream or a provider: R-37's non-goals
+  /// are *"no new dependency; no new service"*, and this is the smallest
+  /// thing a widget can already listen to. It mirrors `_isConnectionLost`
+  /// exactly — the same two-consecutive-failure definition, which is itself
+  /// matched to `cleanupDisconnectedPlayers`' 20 s window — so it introduces
+  /// no second opinion about what "disconnected" means.
+  final ValueNotifier<bool> connectionLost = ValueNotifier<bool>(false);
+
   ConnectionService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _injectedFirestore = firestore;
+
+  /// Resolved lazily, for the same reason `RoomRepository` resolves
+  /// `FirebaseFunctions` lazily and says so: *"`FirebaseFunctions.instance`
+  /// throws until `Firebase.initializeApp` has run, and this repository is
+  /// constructed by a provider that may be read earlier — and by tests that
+  /// never start Firebase at all."*
+  ///
+  /// WP25 made that true of this service too. `ConnectionBanner` (R-37) reads
+  /// `connectionServiceProvider` to watch [connectionLost], and constructing
+  /// the service for a widget must not require a Firestore handle the widget
+  /// will never use. Production is unaffected: `Firebase.initializeApp` runs
+  /// in `main` long before any room screen is built.
+  FirebaseFirestore get _firestore =>
+      _injectedFirestore ?? FirebaseFirestore.instance;
 
   /// Start heartbeat for a player in a room
   ///
@@ -63,7 +93,7 @@ class ConnectionService {
     _currentPlayerId = playerId;
     _isActive = true;
     _consecutiveFailures = 0;
-    _isConnectionLost = false;
+    _setConnectionLost(false);
 
     _telemetry.updateContext({TelemetryKeys.networkStatus: 'connected'});
     _telemetry.track(AppLogCategory.network, 'heartbeat_started');
@@ -112,6 +142,13 @@ class ConnectionService {
     }
   }
 
+  /// Keeps [connectionLost] in step with `_isConnectionLost`. Every write to
+  /// that flag goes through here so the two cannot drift.
+  void _setConnectionLost(bool lost) {
+    _isConnectionLost = lost;
+    connectionLost.value = lost;
+  }
+
   void _onHeartbeatSucceeded() {
     if (!_isConnectionLost) {
       _consecutiveFailures = 0;
@@ -121,7 +158,7 @@ class ConnectionService {
     // The beat got through again: the player is back.
     final missedBeats = _consecutiveFailures;
     _consecutiveFailures = 0;
-    _isConnectionLost = false;
+    _setConnectionLost(false);
 
     _telemetry.updateContext({TelemetryKeys.networkStatus: 'connected'});
     _telemetry.track(
@@ -151,7 +188,7 @@ class ConnectionService {
     // Escalate once per outage, not once per beat, so a flapping network
     // cannot flood crash reporting.
     if (_isConnectionLost) return;
-    _isConnectionLost = true;
+    _setConnectionLost(true);
 
     _telemetry.updateContext({TelemetryKeys.networkStatus: 'lost'});
     _telemetry.fail(
@@ -203,7 +240,7 @@ class ConnectionService {
     _currentRoomCode = null;
     _currentPlayerId = null;
     _consecutiveFailures = 0;
-    _isConnectionLost = false;
+    _setConnectionLost(false);
 
     if (wasRunning) {
       _telemetry.track(AppLogCategory.network, 'heartbeat_stopped');
@@ -237,7 +274,10 @@ class ConnectionService {
 
   /// Dispose and cleanup
   void dispose() {
-    stopHeartbeat();
+    // `stopHeartbeat` is async and resets [connectionLost] in its tail, so
+    // the notifier can only be disposed once that has finished — disposing it
+    // alongside the call left the reset writing to a dead notifier.
+    stopHeartbeat().whenComplete(connectionLost.dispose);
     if (_lifecycleObserver != null) {
       WidgetsBinding.instance.removeObserver(_lifecycleObserver!);
       _lifecycleObserver = null;
@@ -256,16 +296,34 @@ class _AppLifecycleObserver extends WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
         onPause();
         break;
       case AppLifecycleState.resumed:
         onResume();
         break;
-      case AppLifecycleState.hidden:
-        // New state in Flutter 3.13+, treat as paused
-        onPause();
+
+      // WP25 / **R-12**, audit A **H-2**. `inactive` used to pause the
+      // heartbeat, and on iOS it fires for Control Centre, the app switcher
+      // and a notification banner — transient interruptions where the app is
+      // still in the foreground and the player has not gone anywhere.
+      // Pausing there stopped the beats, and two missed beats is the 20 s
+      // window `cleanupDisconnectedPlayers` evicts on, so pulling down
+      // Control Centre could cost a reviewer their own room.
+      //
+      // This is not a new judgement about the lifecycle: `AppSessionObserver`
+      // already made it, and says so in its own words — *"`inactive` fires
+      // for transient interruptions … and closing a session there would
+      // shred the metric into fragments."* Two observers on the same event
+      // disagreed; now they do not.
+      //
+      // **Genuine disconnect detection is unchanged.** A real backgrounding
+      // still delivers `paused` (and `hidden` on newer Flutter), both of
+      // which still pause. The 20 s window, the eviction sweep and WP22's
+      // eligibility filtering are untouched — WP25's stop condition asks for
+      // exactly that guarantee.
+      case AppLifecycleState.inactive:
         break;
     }
   }

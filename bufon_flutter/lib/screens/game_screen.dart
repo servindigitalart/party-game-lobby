@@ -23,6 +23,8 @@ import '../presentation/widgets/bufon_placeholder.dart';
 import '../presentation/widgets/bufon_status_panel.dart';
 import '../presentation/widgets/game_progress_widgets.dart';
 import '../presentation/navigation/page_transitions.dart';
+import '../presentation/navigation/room_exit.dart';
+import '../presentation/widgets/connection_banner.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
 import 'voting_screen.dart';
@@ -242,11 +244,17 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final roomAsync = ref.watch(roomStreamProvider);
     final userId = ref.watch(userIdProvider);
 
-    return roomAsync.when(
+    // WP25 / R-11. `RoomPopScope` makes Android's back gesture a deliberate
+    // leave instead of an accident: every room screen is the root of its own
+    // stack (they arrive through `replaceFadeSlide` / `pushAndRemoveAllFade`),
+    // so back used to pop the *application* while the player's document, their
+    // heartbeat and their room membership all stayed alive.
+    return RoomPopScope(
+      child: roomAsync.when(
       data: (room) {
         if (room == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _navigateToHomeWithMessage('La sala se cerró por desconexión');
+            _navigateToHomeWithMessage(GameCopy.roomClosedTooFewPlayers);
           });
           return const Scaffold(body: Center(child: BufonLoader()));
         }
@@ -324,6 +332,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // WP25 / R-37, BP P4: renders nothing while connected, so
+                  // every existing layout is unchanged in the normal case.
+                  const ConnectionBanner(),
                   // Scrollable region. Everything above the status panel can
                   // grow (long question, 200% text scale, raised keyboard)
                   // without pushing the pinned footer off screen.
@@ -534,6 +545,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             context.pushAndRemoveAllFade(const HomeScreen());
           },
         ),
+      ),
       ),
     );
   }

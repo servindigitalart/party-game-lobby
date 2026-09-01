@@ -19,6 +19,8 @@ import '../core/telemetry/game_telemetry_service.dart';
 import '../core/logging/log_level.dart';
 import '../core/telemetry/telemetry_event.dart';
 import '../presentation/navigation/page_transitions.dart';
+import '../presentation/navigation/room_exit.dart';
+import '../presentation/widgets/connection_banner.dart';
 import '../presentation/screens/paywall_screen.dart';
 import '../presentation/widgets/animated_primary_button.dart';
 import '../presentation/widgets/bufon_feedback.dart';
@@ -82,7 +84,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
 
       // Room was deleted (fewer than 2 players)
       if (room == null && mounted) {
-        _navigateToHomeWithMessage('La sala se cerró por desconexión');
+        _navigateToHomeWithMessage(GameCopy.roomClosedTooFewPlayers);
       }
     } catch (e, stackTrace) {
       // Cleanup retries in 30 seconds, so one failure is not a crash — but
@@ -207,12 +209,18 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     final roomAsync = ref.watch(roomStreamProvider);
     final userId = ref.watch(userIdProvider);
 
-    return roomAsync.when(
+    // WP25 / R-11. `RoomPopScope` makes Android's back gesture a deliberate
+    // leave instead of an accident: every room screen is the root of its own
+    // stack (they arrive through `replaceFadeSlide` / `pushAndRemoveAllFade`),
+    // so back used to pop the *application* while the player's document, their
+    // heartbeat and their room membership all stayed alive.
+    return RoomPopScope(
+      child: roomAsync.when(
       data: (room) {
         if (room == null) {
           // Room deleted, navigate to home
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _navigateToHomeWithMessage('La sala se cerró por desconexión');
+            _navigateToHomeWithMessage(GameCopy.roomClosedTooFewPlayers);
           });
           return const Scaffold(body: Center(child: BufonLoader()));
         }
@@ -243,6 +251,9 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // WP25 / R-37, BP P4: renders nothing while connected, so
+                  // every existing layout is unchanged in the normal case.
+                  const ConnectionBanner(),
                   // Room code — the Protagonist of this screen (Capítulo 3,
                   // ley 4): the one thing every player needs to see/share.
                   Container(
@@ -401,11 +412,17 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         );
       },
       loading: () => const Scaffold(body: Center(child: BufonLoader())),
-      error: (error, stack) => const Scaffold(
+      // WP25 / R-11 (audit A S-5 ≡ BP P7). This placeholder had no action at
+      // all: *"Once a room stream fails, no route out exists: no back arrow,
+      // no retry, no home button. The reviewer must force-quit."*
+      error: (error, stack) => Scaffold(
         body: BufonPlaceholder(
           variant: BufonPlaceholderVariant.error,
           title: 'No se pudo cargar la sala',
+          actionLabel: GameCopy.backToHome,
+          onAction: () => RoomExit.toHome(context, ref),
         ),
+      ),
       ),
     );
   }

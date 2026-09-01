@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_providers.dart';
 import '../core/telemetry/game_telemetry_service.dart';
 import '../core/exceptions.dart';
+import '../core/game_copy.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/bufon_phase.dart';
@@ -234,7 +235,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: AppSpacing.xxl),
+                        const SizedBox(height: AppSpacing.md),
+                        // WP25 / R-23, the half that needs no external fact.
+                        // audit A M-4: *"nothing tells the reviewer the game
+                        // needs 3 people"*, and audit A §3 records it as a
+                        // block point on the very first screen. Stated here,
+                        // before anyone commits to creating a room — R-21's
+                        // scope asks for exactly that.
+                        //
+                        // The *legal* half of R-23 is deliberately absent: it
+                        // depends on the privacy-policy URL, which R-23's own
+                        // BLOCK field names as an App Store Connect fact
+                        // (R-15), and WP18 has recovered none of its facts.
+                        Text(
+                          GameCopy.playersRequired,
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.inkMuted,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
                         TextField(
                           controller: _nameController,
                           decoration: const InputDecoration(

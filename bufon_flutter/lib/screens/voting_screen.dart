@@ -23,6 +23,8 @@ import '../presentation/widgets/bufon_placeholder.dart';
 import '../presentation/widgets/bufon_status_panel.dart';
 import '../presentation/widgets/game_progress_widgets.dart';
 import '../presentation/navigation/page_transitions.dart';
+import '../presentation/navigation/room_exit.dart';
+import '../presentation/widgets/connection_banner.dart';
 import '../services/haptic_service.dart';
 import '../services/sound_service.dart';
 import 'round_result_screen.dart';
@@ -192,7 +194,13 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
 
     // Track screen view (only once per build with different room)
 
-    return roomAsync.when(
+    // WP25 / R-11. `RoomPopScope` makes Android's back gesture a deliberate
+    // leave instead of an accident: every room screen is the root of its own
+    // stack (they arrive through `replaceFadeSlide` / `pushAndRemoveAllFade`),
+    // so back used to pop the *application* while the player's document, their
+    // heartbeat and their room membership all stayed alive.
+    return RoomPopScope(
+      child: roomAsync.when(
       data: (room) {
         if (room == null) {
           return const Scaffold(
@@ -263,6 +271,9 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // WP25 / R-37, BP P4: renders nothing while connected, so
+                  // every existing layout is unchanged in the normal case.
+                  const ConnectionBanner(),
                   // Fase 2B WP5 — the scroll boundary moved outward.
                   //
                   // It used to sit on the answer list alone, which made the
@@ -429,11 +440,15 @@ class _VotingScreenState extends ConsumerState<VotingScreen> {
         );
       },
       loading: () => const Scaffold(body: Center(child: BufonLoader())),
-      error: (error, stack) => const Scaffold(
+      // WP25 / R-11 — see `lobby_screen`. Same dead end, same fix.
+      error: (error, stack) => Scaffold(
         body: BufonPlaceholder(
           variant: BufonPlaceholderVariant.error,
           title: 'No se pudo cargar la votación',
+          actionLabel: GameCopy.backToHome,
+          onAction: () => RoomExit.toHome(context, ref),
         ),
+      ),
       ),
     );
   }

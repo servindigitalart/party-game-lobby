@@ -50,6 +50,39 @@ class GameCopy {
   static const placeholderOffline =
       'Parece que no hay conexión. Revisa tu internet.';
 
+  // WP25 / R-11 — the leave-room affordance. Leaving is deliberate, so it
+  // asks; and it says what leaving costs, because a player who taps back by
+  // reflex is not asking to abandon a game their friends are still in.
+  static const backToHome = 'Volver al Inicio';
+
+  static const leaveRoomTitle = '¿Salir de la sala?';
+  static const leaveRoomBody =
+      'Vas a dejar la partida y volver al inicio. Los demás siguen jugando '
+      'sin ti.';
+  static const leaveRoomStay = 'Me quedo';
+  static const leaveRoomConfirm = 'Salir';
+
+  // WP25 / R-12 — the copy audit A called accusatory.
+  //
+  // It used to read "La sala se cerró por desconexión", which blames the
+  // player's connection for something else entirely: the room is deleted when
+  // fewer than two active players remain (`cleanupDisconnectedPlayers`). A
+  // reviewer who switched apps for twenty seconds was told their internet had
+  // failed. This states what actually happened and does not accuse anyone.
+  static const roomClosedTooFewPlayers =
+      'La sala se cerró: quedaron muy pocos jugadores.';
+
+  // WP25 / R-37 — the connectivity banner. `ConnectionService` has run since
+  // launch with no UI at all, so a player whose heartbeat was failing had no
+  // way to know it, and audit A H-2's confusion had no explanation on screen.
+  static const connectionLost = 'Sin conexión. Reintentando...';
+
+  // WP25 / R-23, the half that needs no external fact: say the requirement
+  // *before* someone commits to creating a room. Audit A M-4 records the
+  // absence as the closest thing to a procedural root cause in the
+  // repository — "nothing tells the reviewer the game needs 3 people".
+  static const playersRequired = 'Se juega de 3 a 8 personas, cada quien en su celular.';
+
   static const revealingAnswers = 'Revelando respuestas...';
   static const countingVotes = 'Contando votos...';
   static const nextRound = 'Siguiente ronda...';
