@@ -96,7 +96,19 @@ const Map<String, AnalyticsEventMapping> analyticsEventMappings = {
   ),
   'session_started': AnalyticsEventMapping(),
   'session_ended': AnalyticsEventMapping(),
-  'app_backgrounded': AnalyticsEventMapping(name: 'app_background'),
+  // WP19 / C-1. This used to map to `app_background`, which is entry 7 of
+  // Firebase's `_reservedEventNames`: `logEvent` rejected it with an
+  // `ArgumentError` on *every* backgrounding, so the event has never once
+  // landed in GA4 and there is no reporting continuity to preserve. The
+  // internal name now carries straight through, exactly as
+  // `session_started`/`session_ended` above already do.
+  //
+  // Its twin below is deliberately left alone: `app_foreground` is **not**
+  // reserved, it has been arriving since launch, and renaming it would break
+  // GA4 continuity for an event that actually works. The resulting asymmetry
+  // between the two lifecycle names is intentional and is the reason this
+  // comment exists — see docs/design/v1.1/CRASHLYTICS_TELEMETRY_AUDIT.md §14.A.
+  'app_backgrounded': AnalyticsEventMapping(),
   'app_resumed': AnalyticsEventMapping(name: 'app_foreground'),
 
   // --- Room lifecycle ---

@@ -128,7 +128,7 @@ Performance
 
 app_open
 
-app_background
+app_backgrounded
 
 app_foreground
 
@@ -137,6 +137,17 @@ session_started
 session_ended
 
 These events help understand retention.
+
+This list previously specified `app_background`. That name is **reserved by
+Firebase Analytics** — `logEvent` rejects it with an `ArgumentError` — so the
+event never reached GA4 even once. The specification, not the code, was the
+defect: `analytics_event_mapping.dart` was faithfully implementing this line.
+Corrected to `app_backgrounded` in WP19; its twin `app_foreground` is not
+reserved and is unchanged.
+
+Before adding a name to this list, check it against Firebase's reserved event
+names. `test/analytics_reserved_names_test.dart` enforces that automatically
+against the installed SDK's own copy of the list.
 
 ---
 
