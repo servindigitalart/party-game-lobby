@@ -1,6 +1,8 @@
 // presentation/widgets/season_countdown_banner.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/logging/log_category.dart';
+import '../../core/telemetry/game_telemetry_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
@@ -13,6 +15,43 @@ class SeasonCountdownBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // WP20 / audit A H-1. Three independent conditions used to collapse to
+    // one identical output — *not authenticated*, *no active season*, and
+    // *any Firestore error* all rendered an empty box, so "the season feature
+    // is off tonight" and "the season feature is broken" were the same
+    // pixels, and a real failure vanished without a trace.
+    //
+    // Two of the three are now separated, and the third is deliberately left
+    // alone:
+    //
+    //  1. **Not authenticated** — gone. `main()` establishes the identity
+    //     before the first frame, so the read that used to be denied by
+    //     `firestore.rules:213` now succeeds.
+    //  2. **A genuine error** — still renders nothing, but is no longer
+    //     silent: it is reported below, so it is visible in Talker and in the
+    //     Crashlytics breadcrumb trail. The event name is deliberately absent
+    //     from `analyticsEventMappings`, so this is an internal diagnostic
+    //     and never a Firebase Analytics event. WP19's boundary is untouched.
+    //  3. **No active season** — keeps rendering nothing, because that is
+    //     correct. A banner announcing a season that does not exist is not an
+    //     honest empty state, it is noise on the app's first screen, and the
+    //     Blueprint places the banner *below* the primary CTAs precisely so it
+    //     stops out-competing the brand (Capítulo 3 ley 4). Home's empty state
+    //     for "no season" is the absence of the banner.
+    //
+    // `ref.listen` rather than a call inside the `error` branch: the branch
+    // runs on every rebuild, the listener runs once per transition.
+    ref.listen(currentSeasonProvider, (previous, next) {
+      final error = next.error;
+      if (error == null || previous?.error == error) return;
+      GameTelemetryService.instance.fail(
+        AppLogCategory.season,
+        'season_load_failed',
+        error: error,
+        stackTrace: next.stackTrace,
+      );
+    });
+
     final seasonAsync = ref.watch(currentSeasonProvider);
 
     return seasonAsync.when(

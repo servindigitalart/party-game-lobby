@@ -25,7 +25,20 @@ final gameControllerProvider = Provider<GameController>((ref) {
   return GameController(firebaseService, roomRepository);
 });
 
-// Current user ID
+// Current user ID.
+//
+// WP20: the initial value is seeded by `main()`, which resolves the anonymous
+// identity before the first frame and overrides this provider. The `null`
+// default below is therefore the *failure* value — no signed-in identity —
+// not the ordinary first-run state it used to be.
+//
+// Consumers must keep that distinction. `null` means "we could not establish
+// an identity", which is a failure worth reporting; it does not mean "this
+// player has no data yet". The empty state belongs to the *data*, not to
+// this provider.
+//
+// Still a writable `StateProvider`: home_screen assigns it after create/join,
+// and this package leaves that path untouched.
 final userIdProvider = StateProvider<String?>((ref) => null);
 
 // Current room code

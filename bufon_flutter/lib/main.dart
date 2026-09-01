@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -15,6 +16,7 @@ import 'core/telemetry/app_session_observer.dart';
 import 'core/telemetry/game_telemetry_service.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
+import 'providers/game_providers.dart';
 import 'screens/home_screen.dart';
 
 void main() {
@@ -97,8 +99,61 @@ void main() {
       payload: await RetentionTracker.instance.readLaunchMetrics(),
     );
 
-    runApp(const ProviderScope(child: MyApp()));
+    // Fase 2B WP20 (R-07 / audit A C-2 + L-1). The anonymous identity is
+    // established *here*, before the first frame.
+    //
+    // `userIdProvider` defaulted to null and was assigned in exactly two
+    // places — home_screen's create-room and join-room handlers. So a clean
+    // install, and every relaunch of a returning player who already had XP,
+    // reached Profile, Leaderboard and the season banner with no auth
+    // session. Firestore denied all three (`firestore.rules:34,172,213,227`)
+    // and each surface reported a *failure* for what was only "nobody ever
+    // signed in". That is the root the Apple audit hangs four findings off.
+    final launchUserId = await _resolveAnonymousIdentity();
+
+    runApp(
+      ProviderScope(
+        // Seeds the initial value only. `userIdProvider` stays a writable
+        // `StateProvider`, so home_screen's existing assignments — which this
+        // package does not touch — keep working exactly as before.
+        overrides: [userIdProvider.overrideWith((ref) => launchUserId)],
+        child: const MyApp(),
+      ),
+    );
   });
+}
+
+/// Returns the anonymous uid to open the app with, or `null` if one could not
+/// be established.
+///
+/// `currentUser` is read first because nothing in the app ever did (audit A
+/// L-1): a returning player restores the uid they already have, with no
+/// network round trip and without minting a second anonymous account.
+///
+/// Called after `AppCheckService.activate()` on purpose, so the sign-in
+/// request carries an attestation token like every other Firebase call. No
+/// attestation behaviour changes.
+///
+/// **Deliberately never fatal.** If Anonymous Auth is disabled in the console
+/// or the device is offline at launch, the app must still start. It starts
+/// without an identity — exactly as it did before this change — and the
+/// surfaces that need one say so honestly rather than pretending the player
+/// simply has no progress yet.
+Future<String?> _resolveAnonymousIdentity() async {
+  final existing = FirebaseAuth.instance.currentUser?.uid;
+  if (existing != null) return existing;
+
+  try {
+    return (await FirebaseAuth.instance.signInAnonymously()).user?.uid;
+  } catch (error, stackTrace) {
+    CrashReporter.instance.recordNonFatal(
+      error,
+      stackTrace: stackTrace,
+      category: AppLogCategory.firebase,
+      reason: 'Anonymous sign-in failed at launch',
+    );
+    return null;
+  }
 }
 
 Stream<LicenseEntry> _brandFontLicenses() async* {

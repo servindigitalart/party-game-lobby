@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/theme/bufon_phase.dart';
+import '../widgets/bufon_feedback.dart';
 import '../widgets/bufon_loader.dart';
 import '../widgets/bufon_placeholder.dart';
 import '../../models/achievement.dart';
@@ -44,6 +45,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileStreamProvider);
 
+    // WP20: the two reasons this screen can have nothing to show are not the
+    // same reason, and used to render identically. `main()` now establishes
+    // the anonymous identity before the first frame, so a null id here means
+    // sign-in actually failed — a failure — while a null *profile* under a
+    // real id means the player simply has not finished a match yet.
+    final hasIdentity = ref.watch(userIdProvider) != null;
+
     // Fase 2B WP1: this screen was authored against `AppTheme.legacyTheme`
     // and paints legacy dark surfaces directly, but Fase 2A made
     // `lightTheme` the app theme — and a pushed route does not inherit the
@@ -66,16 +74,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             tooltip: 'Ver perfil público',
             onPressed: () {
               final userId = ref.read(userIdProvider);
-              if (userId != null) {
-                HapticService.lightImpact();
-                Navigator.push(
+              // WP20 / audit A C-2 §4: this `if` had no `else`. With no
+              // identity the tap produced nothing at all — no navigation, no
+              // message, no haptic — which reads as a broken control rather
+              // than as an unavailable one.
+              if (userId == null) {
+                BufonFeedback.show(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ProfilePublicScreen(userId: userId, isOwnProfile: true),
-                  ),
+                  'Todavía no podemos abrir tu perfil público. '
+                  'Inténtalo de nuevo en un momento.',
                 );
+                return;
               }
+              HapticService.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ProfilePublicScreen(userId: userId, isOwnProfile: true),
+                ),
+              );
             },
           ),
         ],
@@ -84,10 +102,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       body: profileAsync.when(
         data: (profile) {
           if (profile == null) {
-            return const BufonPlaceholder(
-              variant: BufonPlaceholderVariant.error,
-              title: 'No se pudo cargar el perfil',
-            );
+            // Signed in, no profile document yet: the first-run state of
+            // every player, and the state a reviewer on a clean install is
+            // in. Capítulo 25's `empty` variant — the one that shows the
+            // isotype — with copy that says what to do about it.
+            if (hasIdentity) {
+              return const BufonPlaceholder(
+                title: 'Tu perfil empieza aquí',
+                message:
+                    'Juega tu primera partida y aquí aparecerán tu nivel, '
+                    'tus avatares y tus logros.',
+              );
+            }
+            // No identity. That is a real failure and keeps saying so.
+            return _buildIdentityError();
           }
 
           return Column(
@@ -121,14 +149,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           );
         },
         loading: () => const Center(child: BufonLoader()),
-        error: (error, stack) => const BufonPlaceholder(
-          variant: BufonPlaceholderVariant.error,
-          title: 'No se pudo cargar el perfil',
-        ),
+        // A stream failure is a genuine backend failure and must not be
+        // laundered into an empty state. It keeps the error variant, and
+        // gains the retry the leaderboard's equivalent already had.
+        error: (error, stack) => _buildIdentityError(),
       ),
     );
 
     return PhaseScope(phase: BufonPhase.legacy, child: content);
+  }
+
+  /// The failure placeholder, shared by the two states that really are
+  /// failures: no identity, and a profile stream that errored.
+  ///
+  /// The exception is deliberately not a parameter — it was never rendered,
+  /// and taking it would invite rendering it (Capítulo 26). It already
+  /// reaches Crashlytics through the layer that raised it.
+  Widget _buildIdentityError() {
+    return BufonPlaceholder(
+      variant: BufonPlaceholderVariant.error,
+      title: 'No se pudo cargar el perfil',
+      actionLabel: 'Reintentar',
+      onAction: () => ref.invalidate(userProfileStreamProvider),
+    );
   }
 
   Widget _buildProfileHeader(dynamic profile) {

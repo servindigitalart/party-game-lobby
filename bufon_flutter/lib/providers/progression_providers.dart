@@ -11,7 +11,19 @@ final progressionControllerProvider = Provider<ProgressionController>((ref) {
   return ProgressionController();
 });
 
-/// User profile stream provider
+/// User profile stream provider.
+///
+/// **The contract, made explicit by WP20.** `null` data means *signed in, no
+/// profile document written yet* — the honest empty state of a player who has
+/// not finished a match. It does **not** mean "something went wrong", and no
+/// consumer may render it as a failure.
+///
+/// A missing identity is a different thing and is deliberately still reported
+/// as `null` here rather than as a stream error: `title_providers.dart:45`
+/// reads this provider's `.value` and an error would be indistinguishable
+/// from an empty profile there. The identity/data distinction is drawn where
+/// it can be drawn correctly — at the screen, which reads `userIdProvider`
+/// alongside this provider (see `profile_screen.dart`).
 final userProfileStreamProvider = StreamProvider<UserProfile?>((ref) {
   final userId = ref.watch(userIdProvider);
 
