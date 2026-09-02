@@ -234,22 +234,28 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
               .map((standing) => standing.player)
               .toList();
 
-          // Ties share a score, so they share this number too.
+          // **R-19.** The night's votes, derived from the night's score.
           //
-          // The one-winner branch is the original expression, kept exactly so
-          // the ordinary ceremony does not change. It is also the defect
-          // **R-19** records — `clearRoundData` nulls `votedFor` every round,
-          // so it shows the last round rather than the night — and R-19 is a
-          // separate item that will retire both branches for `score ~/ 100`.
-          // Until then the tie branch uses the night's total, because the
-          // last-round expression has no defined meaning across a set.
-          final votesReceived = winners.isEmpty
-              ? 0
-              : winners.length == 1
-              ? room.players
-                    .where((player) => player.votedFor == winners.first.id)
-                    .length
-              : winners.first.score ~/ 100;
+          // This used to count `votedFor == winner.id` across the room when
+          // there was exactly one winner — the final round's votes, not the
+          // night's, because `clearRoundData` nulls `votedFor` at the end of
+          // every round. A player who earned five votes across five rounds
+          // was congratulated for the one they earned in the last, while the
+          // backend awarded XP on the real total. Two numbers for one
+          // concept, and the smaller one was on screen.
+          //
+          // `score ~/ 100` is the same quantity the server publishes as
+          // `votesReceived` (`onMatchCompleted.ts:168`, `Math.floor(score /
+          // 100)`), so the ceremony and the backend now read one definition.
+          // It is also why **D-5** guards the divisor: change what `score`
+          // means and this line, XP, achievements, titles and the
+          // leaderboards all go wrong together.
+          //
+          // Tied winners share a score, so they share this number too — the
+          // branch that used to be needed for a set has no reason to exist
+          // once the single-winner case stops being special.
+          final votesReceived =
+              winners.isEmpty ? 0 : winners.first.score ~/ 100;
 
           // Progression is not triggered from here any more. The
           // `onMatchCompleted` Cloud Function fires on the same
