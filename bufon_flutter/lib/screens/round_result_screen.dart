@@ -220,12 +220,36 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
             context.replaceFadeSlide(const GameScreen());
           });
         } else if (room.phase == GamePhase.finalWinner) {
-          final sortedPlayers = [...room.players]
-            ..sort((a, b) => b.score.compareTo(a.score));
-          final winner = sortedPlayers.first;
-          final votesReceived = room.players
-              .where((player) => player.votedFor == winner.id)
-              .length;
+          // WP24 / **PD-4(a)**, R-17. The night's ranking is produced once,
+          // here, and both the ceremony and the standings read from it. This
+          // used to be a bare score sort followed by `.first` — a single
+          // winner invented on the client, which contradicted
+          // `onMatchCompleted`'s already-tested "everyone tied wins" policy
+          // and crowned whichever tied player's anonymous UID happened to
+          // sort first. `isWinner` now comes from score alone, with the
+          // server's exact expression.
+          final standings = room.players.finalRanking;
+          final winners = standings
+              .where((standing) => standing.isWinner)
+              .map((standing) => standing.player)
+              .toList();
+
+          // Ties share a score, so they share this number too.
+          //
+          // The one-winner branch is the original expression, kept exactly so
+          // the ordinary ceremony does not change. It is also the defect
+          // **R-19** records — `clearRoundData` nulls `votedFor` every round,
+          // so it shows the last round rather than the night — and R-19 is a
+          // separate item that will retire both branches for `score ~/ 100`.
+          // Until then the tie branch uses the night's total, because the
+          // last-round expression has no defined meaning across a set.
+          final votesReceived = winners.isEmpty
+              ? 0
+              : winners.length == 1
+              ? room.players
+                    .where((player) => player.votedFor == winners.first.id)
+                    .length
+              : winners.first.score ~/ 100;
 
           // Progression is not triggered from here any more. The
           // `onMatchCompleted` Cloud Function fires on the same
@@ -237,7 +261,7 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
           WidgetsBinding.instance.addPostFrameCallback((_) {
             context.replaceFadeSlide(
               FinalWinnerScreen(
-                winnerName: winner.name,
+                winnerNames: winners.map((player) => player.name).toList(),
                 // The winner's own equipped avatar can only be resolved by
                 // the winner's own device: firestore.rules restricts
                 // /users/{uid} reads to `request.auth.uid == userId`, so a
@@ -251,11 +275,14 @@ class _RoundResultScreenState extends ConsumerState<RoundResultScreen>
                 // doc, or relax the rule); see PHASE_2A_RECOVERY_REPORT.md.
                 winnerAvatarId: 'default',
                 votesReceived: votesReceived,
-                totalScore: winner.score,
-                isCurrentUserWinner: winner.id == userId,
-                // Already sorted and already in memory — the ceremony's
+                totalScore: winners.isEmpty ? 0 : winners.first.score,
+                // Membership in the set, not identity with one chosen player.
+                isCurrentUserWinner: winners.any(
+                  (player) => player.id == userId,
+                ),
+                // Already ranked and already in memory — the ceremony's
                 // standings section needs no query of its own.
-                standings: sortedPlayers,
+                standings: standings,
               ),
             );
           });

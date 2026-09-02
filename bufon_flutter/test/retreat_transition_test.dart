@@ -58,12 +58,12 @@ void main() {
       child: MaterialApp(
         navigatorObservers: [observer],
         home: FinalWinnerScreen(
-          winnerName: 'Sofía',
+          winnerNames: const ['Sofía'],
           winnerAvatarId: 'default',
           votesReceived: 4,
           totalScore: 30,
           isCurrentUserWinner: false,
-          standings: standings,
+          standings: standings.finalRanking,
         ),
       ),
     ),

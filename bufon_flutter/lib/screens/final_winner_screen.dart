@@ -55,22 +55,29 @@ import 'home_screen.dart';
 /// what replaces them is the same Butter/Graphite vocabulary the rest of the
 /// app now speaks.
 class FinalWinnerScreen extends StatefulWidget {
-  final String winnerName;
+  /// Every player the server crowned — **not** one chosen from among them.
+  ///
+  /// WP24 / **PD-4(a)**. This was a single `String winnerName`, which is what
+  /// forced the caller to pick one player out of a tied set and is the reason
+  /// the room saw one name while the backend credited three. A list states
+  /// the outcome the server actually computed: empty when nobody scored, one
+  /// name in the ordinary case, several on a tie.
+  final List<String> winnerNames;
+
   final String winnerAvatarId;
   final int votesReceived;
   final int totalScore;
   final bool isCurrentUserWinner;
 
-  /// Final standings, highest score first. Optional because the data already
-  /// exists at the only call site (`round_result_screen.dart` sorts the room's
-  /// players to pick the winner) — passing it costs no query, no new model and
-  /// no rule change. Empty means "no standings section", which keeps every
-  /// other construction of this screen valid.
-  final List<Player> standings;
+  /// The night's final ranking, already produced by [FinalRanking]. Optional
+  /// because the data already exists at the only call site — passing it costs
+  /// no query, no new model and no rule change. Empty means "no standings
+  /// section", which keeps every other construction of this screen valid.
+  final List<FinalStanding> standings;
 
   const FinalWinnerScreen({
     super.key,
-    required this.winnerName,
+    required this.winnerNames,
     required this.winnerAvatarId,
     required this.votesReceived,
     required this.totalScore,
@@ -221,16 +228,21 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       _WinnerReveal(
-                        winnerName: widget.winnerName,
+                        winnerNames: widget.winnerNames,
                         stage: _stage,
                         keyholeProgress: _keyholeProgress,
                       ),
-                      const SizedBox(height: AppSpacing.lg),
-                      _CeremonialStats(
-                        votesReceived: widget.votesReceived,
-                        totalScore: widget.totalScore,
-                        stage: _stage,
-                      ),
+                      // Votes and points belong to a winner. With an empty
+                      // winner set there is nobody for them to describe, so
+                      // the block is withheld rather than printed as zeros.
+                      if (widget.winnerNames.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.lg),
+                        _CeremonialStats(
+                          votesReceived: widget.votesReceived,
+                          totalScore: widget.totalScore,
+                          stage: _stage,
+                        ),
+                      ],
 
                       // THE GATE. The standings' first row is the winner, so
                       // showing them before the reveal would answer the
@@ -238,7 +250,7 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
                       // the round reveal had until Fase 2A.
                       if (_stage >= 2 && widget.standings.isNotEmpty) ...[
                         const SizedBox(height: AppSpacing.xl),
-                        _FinalStandings(players: widget.standings),
+                        _FinalStandings(standings: widget.standings),
                       ],
 
                       if (_stage >= 2) ...[
@@ -257,7 +269,8 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
               // the reveal — the same class of leak the standings gate closes
               // visually. It is mounted a full stage before the share button
               // can be pressed, so `_cardKey` is always laid out in time.
-              if (_stage >= 1) _buildOffScreenCard(avatar),
+              if (_stage >= 1 && widget.winnerNames.isNotEmpty)
+                _buildOffScreenCard(avatar),
             ],
           ),
         ),
@@ -273,13 +286,18 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
         // that work. Presentation-only: every viewer already holds the name,
         // votes and score the card renders, so nothing new is read. The text
         // that leaves the app is chosen by status — see [_shareVictoryCard].
-        AnimatedPrimaryButton(
-          text: _isSharing ? 'Generando...' : 'Compartir victoria',
-          onPressed: _isSharing ? null : _shareVictoryCard,
-          icon: Icons.share,
-          isLoading: _isSharing,
-        ),
-        const SizedBox(height: AppSpacing.md),
+        // Nothing to share when the winner set is empty: the card renders a
+        // name, and there is no name. The exit stays, so the screen is never
+        // a dead end.
+        if (widget.winnerNames.isNotEmpty) ...[
+          AnimatedPrimaryButton(
+            text: _isSharing ? 'Generando...' : 'Compartir victoria',
+            onPressed: _isSharing ? null : _shareVictoryCard,
+            icon: Icons.share,
+            isLoading: _isSharing,
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
         // Secondary by construction: outline, not fill, so the ceremony keeps
         // one primary action (Capítulo 3 ley 4).
         AnimatedPrimaryButton(
@@ -299,7 +317,7 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
       top: -10000,
       child: ShareVictoryCard(
         repaintKey: _cardKey,
-        playerName: widget.winnerName,
+        playerName: GameCopy.winnerNames(widget.winnerNames),
         avatarId: widget.winnerAvatarId,
         votesReceived: widget.votesReceived,
         roundWins: widget.totalScore,
@@ -340,7 +358,8 @@ class _FinalWinnerScreenState extends State<FinalWinnerScreen>
         [XFile(file.path)],
         text: GameCopy.shareVictory(
           isWinner: widget.isCurrentUserWinner,
-          winnerName: widget.winnerName,
+          winnerName: GameCopy.winnerNames(widget.winnerNames),
+          winnerCount: widget.winnerNames.length,
         ),
       );
 
@@ -487,15 +506,67 @@ class _CeremonialCrest extends StatelessWidget {
 
 /// The night's last secret, opening through the brand's own gesture.
 class _WinnerReveal extends StatelessWidget {
-  final String winnerName;
+  /// Every crowned player. WP24 / PD-4(a) — see [FinalWinnerScreen.winnerNames].
+  final List<String> winnerNames;
+
   final int stage;
   final Animation<double> keyholeProgress;
 
   const _WinnerReveal({
-    required this.winnerName,
+    required this.winnerNames,
     required this.stage,
     required this.keyholeProgress,
   });
+
+  /// What opens through the keyhole.
+  ///
+  /// With exactly one winner this is the same single [Text] it has always
+  /// been, so the ordinary ceremony is untouched down to the pixel. The other
+  /// two branches exist because PD-4(a) made them reachable: several names at
+  /// **equal prominence** when players tie — no first place among them, no
+  /// larger name, no ordering that reads as a ranking — and an honest line
+  /// when nobody scored at all.
+  Widget _revealed(BuildContext context) {
+    if (winnerNames.isEmpty) {
+      return Text(
+        GameCopy.nightNoWinner,
+        style: AppTypography.h3.copyWith(color: context.phase.onSurfaceMuted),
+        textAlign: TextAlign.center,
+      );
+    }
+
+    if (winnerNames.length == 1) {
+      return Text(
+        winnerNames.first,
+        // The canonical replacement for the retired `displayGold`. The accent
+        // is spent on the one word the whole night was building toward.
+        style: AppTypography.displayButter,
+        textAlign: TextAlign.center,
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          GameCopy.nightWinnersTied,
+          style: AppTypography.h4.copyWith(color: context.phase.accent),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        // Same style for every name, deliberately. The tie is the outcome;
+        // making one of them look like the answer would restate the defect
+        // PD-4 exists to remove.
+        for (final name in winnerNames) ...[
+          Text(
+            name,
+            style: AppTypography.displayButter,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -515,7 +586,7 @@ class _WinnerReveal extends StatelessWidget {
               textAlign: TextAlign.center,
             )
           : ClipRRect(
-              key: ValueKey('winner-$winnerName'),
+              key: ValueKey('winner-${winnerNames.join('|')}'),
               borderRadius: AppShapes.borderRadiusMd,
               child: KeyholeRevealTransition(
                 // Capítulo 28: the reduced path keeps the AnimatedSwitcher's
@@ -530,14 +601,7 @@ class _WinnerReveal extends StatelessWidget {
                     horizontal: AppSpacing.md,
                     vertical: AppSpacing.sm,
                   ),
-                  child: Text(
-                    winnerName,
-                    // The canonical replacement for the retired
-                    // `displayGold`. The accent is spent on the one word the
-                    // whole night was building toward.
-                    style: AppTypography.displayButter,
-                    textAlign: TextAlign.center,
-                  ),
+                  child: _revealed(context),
                 ),
               ),
             ),
@@ -618,9 +682,12 @@ class _CeremonialStats extends StatelessWidget {
 /// How the night ended for everyone else. Secondary by construction: compact
 /// rows, no card chrome, and it never precedes the reveal.
 class _FinalStandings extends StatelessWidget {
-  final List<Player> players;
+  /// The ranking produced once by [FinalRanking], carrying its own rank and
+  /// winner flag. WP24 / PD-4(a): the row no longer infers either from its
+  /// position in the list.
+  final List<FinalStanding> standings;
 
-  const _FinalStandings({required this.players});
+  const _FinalStandings({required this.standings});
 
   @override
   Widget build(BuildContext context) {
@@ -639,8 +706,17 @@ class _FinalStandings extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          for (var i = 0; i < players.length; i++)
-            _row(context, players[i], i + 1, isWinner: i == 0),
+          // Rank and winner status both come from the standing, not from the
+          // index. `i + 1` was ordinal ranking, which prints 1/2/3 for three
+          // players who tied, and `i == 0` tinted exactly one row no matter
+          // how many the server crowned.
+          for (final standing in standings)
+            _row(
+              context,
+              standing.player,
+              standing.rank,
+              isWinner: standing.isWinner,
+            ),
         ],
       ),
     );

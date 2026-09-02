@@ -110,7 +110,34 @@ class GameCopy {
   static String shareVictory({
     required bool isWinner,
     required String winnerName,
-  }) => isWinner
-      ? '¡Soy el Bufón de la Noche! 🏆'
-      : '$winnerName es el Bufón de la Noche. 🏆';
+    int winnerCount = 1,
+  }) {
+    // WP24 / PD-4(a): a tie is reported, not broken, so the share text has to
+    // survive more than one winner. The single-winner strings are unchanged.
+    if (isWinner) {
+      return winnerCount > 1
+          ? '¡Empatamos como Bufones de la Noche! 🏆'
+          : '¡Soy el Bufón de la Noche! 🏆';
+    }
+    return winnerCount > 1
+        ? '$winnerName empataron como Bufones de la Noche. 🏆'
+        : '$winnerName es el Bufón de la Noche. 🏆';
+  }
+
+  /// Stated with the names when more than one player ties for the top score.
+  ///
+  /// WP24 / PD-4(a): the ceremony must say *these players all won* rather than
+  /// letting a reader assume the first name listed is the real winner.
+  static const nightWinnersTied = '¡EMPATE! Todos son BUFÓN de la Noche';
+
+  /// Stated when the winner set is empty — nobody scored, so nobody is
+  /// crowned. The server's rule carries `score > 0` for the same reason.
+  static const nightNoWinner = 'Nadie se llevó la corona esta noche';
+
+  /// Joins winner names for a single line of ceremony copy.
+  static String winnerNames(List<String> names) {
+    if (names.isEmpty) return '';
+    if (names.length == 1) return names.first;
+    return '${names.sublist(0, names.length - 1).join(', ')} y ${names.last}';
+  }
 }

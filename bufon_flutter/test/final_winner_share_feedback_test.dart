@@ -47,12 +47,12 @@ void main() {
   Widget harness() => MaterialApp(
     key: UniqueKey(),
     home: FinalWinnerScreen(
-      winnerName: 'Sofía',
+      winnerNames: const ['Sofía'],
       winnerAvatarId: 'default',
       votesReceived: 4,
       totalScore: 30,
       isCurrentUserWinner: true,
-      standings: standings,
+      standings: standings.finalRanking,
     ),
   );
 

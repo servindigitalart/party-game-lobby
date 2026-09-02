@@ -25,12 +25,12 @@ void main() {
         data: MediaQueryData(disableAnimations: reduceMotion),
         child: MaterialApp(
           home: FinalWinnerScreen(
-            winnerName: 'Sofía',
+            winnerNames: const ['Sofía'],
             winnerAvatarId: 'default',
             votesReceived: 4,
             totalScore: 30,
             isCurrentUserWinner: isWinner,
-            standings: standings,
+            standings: standings.finalRanking,
           ),
         ),
       );
