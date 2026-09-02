@@ -295,7 +295,7 @@ The unrelated working-tree change and all untracked design documents were **pres
 
 ## 17. Commit
 
-`5b60e6f` — **feat: add visible practice mode**
+`ed8d95f` — **feat: add visible practice mode**
 
 Eight files: six production, one test, one report. Nothing else.
 
