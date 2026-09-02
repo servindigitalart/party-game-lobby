@@ -4,11 +4,33 @@ import '../models/room.dart';
 import '../services/firebase_service.dart';
 import '../services/question_service.dart';
 import '../services/connection_service.dart';
+import '../data/repositories/practice_room_repository.dart';
 import '../data/repositories/room_repository.dart';
 import '../domain/controllers/game_controller.dart';
 
+// Practice Mode (PD-12(c) / R-21).
+//
+// Flipped by a person tapping "Practica solo" on Home, and by nothing else.
+// It is not derived from the build mode, the user's identity, a remote value,
+// or any attempt to detect App Review — the app cannot tell who is holding it
+// and does not try.
+final practiceModeProvider = StateProvider<bool>((ref) => false);
+
 // Repositories
-final roomRepositoryProvider = Provider((ref) => RoomRepository());
+//
+// The one seam Practice needs. `PracticeRoomRepository` implements the same
+// interface and is swapped in here, so every consumer below — the room
+// stream, the game controller, and through them the production lobby, game,
+// voting, round-result and ceremony screens — drives a Practice game with no
+// knowledge that it is one. Multiplayer keeps the Firestore implementation.
+final roomRepositoryProvider = Provider<RoomRepository>((ref) {
+  if (ref.watch(practiceModeProvider)) {
+    final practice = PracticeRoomRepository();
+    ref.onDispose(practice.dispose);
+    return practice;
+  }
+  return RoomRepository();
+});
 
 // Services
 final firebaseServiceProvider = Provider((ref) => FirebaseService());

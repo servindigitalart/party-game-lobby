@@ -95,6 +95,17 @@ class GameCopy {
   // repository — "nothing tells the reviewer the game needs 3 people".
   static const playersRequired = 'Se juega de 3 a 8 personas, cada quien en su celular.';
 
+  /// Practice Mode's Home entry (PD-12(c)).
+  ///
+  /// Honest product copy. Bufón is a game for three to eight people and says
+  /// so; Practice is how one person plays it anyway, against two simulated
+  /// bufones. It is a feature, not a workaround, and the copy never calls it
+  /// a demo, a test, a preview or anything to do with review.
+  static const practiceTitle = 'Practica solo';
+  static const practiceSubtitle =
+      'Juega una partida completa contra dos bufones simulados.';
+  static const practiceHumanName = 'Tú';
+
   static const revealingAnswers = 'Revelando respuestas...';
   static const countingVotes = 'Contando votos...';
   static const nextRound = 'Siguiente ronda...';

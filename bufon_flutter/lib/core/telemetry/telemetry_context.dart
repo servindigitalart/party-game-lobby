@@ -20,6 +20,12 @@ class TelemetryKeys {
   static const String round = 'round';
   static const String questionId = 'question_id';
   static const String gameState = 'game_state';
+
+  /// Which product mode the session is playing: `multiplayer` or `practice`.
+  ///
+  /// PD-12(c). A product dimension, not a reviewer signal — it records what
+  /// the player chose on Home and nothing about who they are.
+  static const String gameMode = 'game_mode';
   static const String networkStatus = 'network_status';
   static const String sessionDurationSeconds = 'session_duration_seconds';
 

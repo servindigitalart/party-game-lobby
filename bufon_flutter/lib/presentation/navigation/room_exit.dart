@@ -69,6 +69,9 @@ class RoomExit {
     await connectionService.stopHeartbeat();
 
     ref.read(roomCodeProvider.notifier).state = null;
+    // Leaving a Practice game returns the seam to Firestore, so the next
+    // multiplayer room is a real one. Harmless after a multiplayer exit.
+    ref.read(practiceModeProvider.notifier).state = false;
 
     if (!context.mounted) return;
     if (message != null) BufonFeedback.show(context, message);

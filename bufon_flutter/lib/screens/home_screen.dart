@@ -1,8 +1,10 @@
 // screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../data/repositories/practice_room_repository.dart';
 import '../providers/game_providers.dart';
 import '../core/telemetry/game_telemetry_service.dart';
+import '../core/telemetry/telemetry_context.dart';
 import '../core/exceptions.dart';
 import '../core/game_copy.dart';
 import '../core/theme/app_colors.dart';
@@ -78,6 +80,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Multiplayer is Firestore-backed. Stated rather than assumed, so a
+      // previous Practice session can never leave the seam pointing at the
+      // in-memory repository.
+      ref.read(practiceModeProvider.notifier).state = false;
+      GameTelemetryService.instance.updateContext({
+        TelemetryKeys.gameMode: 'multiplayer',
+      });
+
       final gameController = ref.read(gameControllerProvider);
 
       // Sign in anonymously
@@ -107,6 +117,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  /// Starts a Practice game (PD-12(c) / R-21).
+  ///
+  /// Deliberately shorter than `_createRoom`, and every omission is the
+  /// point: no `signInAnonymously`, so Practice needs no Firebase Auth and
+  /// works on a clean install before any identity exists; and no
+  /// `startHeartbeat`, because presence is a Firestore concern and Practice
+  /// writes nothing. Everything after this runs on the production screens.
+  Future<void> _startPractice() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Flip the seam before reading the controller: `gameControllerProvider`
+      // watches `roomRepositoryProvider`, which watches this.
+      ref.read(practiceModeProvider.notifier).state = true;
+      GameTelemetryService.instance.updateContext({
+        TelemetryKeys.gameMode: 'practice',
+      });
+
+      final name = _nameController.text.trim().isEmpty
+          ? GameCopy.practiceHumanName
+          : _nameController.text.trim();
+
+      // A local identifier, not an account. Nothing reads it but the
+      // in-memory room.
+      const humanId = 'practice-human';
+      ref.read(userIdProvider.notifier).state = humanId;
+
+      // Straight to the repository, deliberately not through
+      // `GameController.createRoom`. That path exists to retry room-code
+      // collisions and it reaches `FirebaseService`, which builds
+      // `FirebaseAuth.instance` in a field initialiser — so going through it
+      // would make Practice depend on a Firebase app for no benefit. A
+      // Practice room is local and cannot collide, so there is nothing to
+      // retry and nothing to generate.
+      final room = await ref
+          .read(roomRepositoryProvider)
+          .createRoom(PracticeRoomRepository.roomCode, humanId, name);
+      ref.read(roomCodeProvider.notifier).state = room.code;
+
+      // The same Session Context a multiplayer room sets, so later events
+      // carry the room without repeating it in a payload.
+      GameTelemetryService.instance.updateContext({
+        TelemetryKeys.roomCode: room.code,
+        TelemetryKeys.hostId: humanId,
+        TelemetryKeys.playerId: humanId,
+        TelemetryKeys.playerName: name,
+        TelemetryKeys.playerCount: room.players.length,
+      });
+
+      if (mounted) {
+        context.replaceFadeSlide(const LobbyScreen());
+      }
+    } catch (e) {
+      ref.read(practiceModeProvider.notifier).state = false;
+      _showError(_friendlyRoomError(e, fallback: 'Error al iniciar la práctica'));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _joinRoom() async {
     if (_nameController.text.trim().isEmpty) {
       _showError('Por favor ingresa tu nombre');
@@ -121,6 +191,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _isLoading = true);
 
     try {
+      ref.read(practiceModeProvider.notifier).state = false;
+      GameTelemetryService.instance.updateContext({
+        TelemetryKeys.gameMode: 'multiplayer',
+      });
+
       final gameController = ref.read(gameControllerProvider);
 
       // Sign in anonymously
@@ -318,6 +393,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           onPressed: _isLoading ? null : _joinRoom,
                         ),
                         const SizedBox(height: AppSpacing.lg),
+                        // PD-12(c). Tertiary by construction: a text button
+                        // under both multiplayer panels, carrying neither a
+                        // fill nor an outline, so the two ways to play with
+                        // other people keep the visual weight. Practice is a
+                        // real product feature, not a fallback — it is simply
+                        // not what Bufón is for.
+                        _PracticeEntry(
+                          onPressed: _isLoading ? null : _startPractice,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
                         // A season is context, not the reason the app was
                         // opened: it sits below the primary actions so it
                         // stops out-competing the brand for attention on the
@@ -330,6 +415,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               },
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Home's third way in (PD-12(c) / R-21).
+///
+/// Bufón is a game for three to eight people on three to eight phones, and
+/// Home says so directly above this. Practice is how one person plays it
+/// anyway — a full night against two simulated bufones — and it is offered as
+/// an ordinary feature, in ordinary language, to everyone.
+///
+/// Composed to stay tertiary: no fill, no outline, one line of label over one
+/// line of explanation, below both multiplayer panels. Capítulo 3 ley 4 gives
+/// a screen one primary action, and on Home that is still "Crear Sala".
+class _PracticeEntry extends StatelessWidget {
+  const _PracticeEntry({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final phase = context.phase;
+
+    return Semantics(
+      button: true,
+      label: '${GameCopy.practiceTitle}. ${GameCopy.practiceSubtitle}',
+      excludeSemantics: true,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              GameCopy.practiceTitle,
+              textAlign: TextAlign.center,
+              style: AppTypography.body1.copyWith(
+                color: phase.onSurface,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              GameCopy.practiceSubtitle,
+              textAlign: TextAlign.center,
+              style: AppTypography.body2.copyWith(color: phase.onSurfaceMuted),
+            ),
+          ],
         ),
       ),
     );
