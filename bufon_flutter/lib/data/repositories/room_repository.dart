@@ -6,6 +6,7 @@ import '../../models/room.dart';
 import '../../models/player.dart';
 import '../../models/game_phase.dart';
 import '../../core/exceptions.dart';
+import '../../core/moderation/content_filter.dart';
 import '../../core/logging/log_category.dart';
 import '../../core/logging/log_level.dart';
 import '../../core/telemetry/game_telemetry_service.dart';
@@ -598,6 +599,9 @@ class RoomRepository {
     String playerId,
     String answer,
   ) async {
+    // Before the write, not after: a refused answer never reaches Firestore
+    // and is never seen by another player.
+    ContentFilter.instance.enforce(answer);
     final trimmedAnswer = answer.trim();
     if (trimmedAnswer.isEmpty) {
       throw GameException('Answer cannot be empty', code: 'EMPTY_ANSWER');
@@ -694,6 +698,11 @@ class RoomRepository {
 
   /// Create room (with host as first player)
   Future<Room> createRoom(String code, String hostId, String hostName) async {
+    // R-20 Package 1. The name is checked here rather than in the widget
+    // because this is where it crosses into Firestore — and because a name
+    // does not stay in the room: `onMatchCompleted` copies it to the
+    // leaderboard `nickname`, which every authenticated user can read.
+    ContentFilter.instance.enforce(hostName);
     final roomRef = _firestore.collection('rooms').doc(code);
     final existingRoom = await roomRef.get();
     if (existingRoom.exists) {
@@ -725,6 +734,7 @@ class RoomRepository {
 
   /// Join room by adding player to subcollection
   Future<Room> joinRoom(String code, Player player) async {
+    ContentFilter.instance.enforce(player.name);
     final roomRef = _firestore.collection('rooms').doc(code);
     final playerRef = _playersCollection(code).doc(player.id);
 

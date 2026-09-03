@@ -214,6 +214,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         return 'Ya mandaste tu respuesta.';
       case 'EMPTY_ANSWER':
         return 'Escribe una respuesta primero.';
+      case 'CONTENT_NOT_ALLOWED':
+        return GameCopy.contentNotAllowed;
       case 'ROOM_NOT_FOUND':
         return 'La sala ya no existe.';
     }

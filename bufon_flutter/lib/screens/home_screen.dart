@@ -245,6 +245,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // genuinely enforces it for this room.
         case 'PLAYER_REMOVED':
           return GameCopy.removedCannotRejoin;
+        case 'CONTENT_NOT_ALLOWED':
+          return GameCopy.contentNotAllowed;
         case 'ROOM_EXISTS':
           return 'No pudimos crear sala. Intenta de nuevo.';
       }

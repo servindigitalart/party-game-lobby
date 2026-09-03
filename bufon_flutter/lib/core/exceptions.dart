@@ -27,6 +27,19 @@ class RoomException extends GameException {
   String toString() => 'RoomException: $message';
 }
 
+/// Thrown when player text is refused by the objectionable-content policy.
+///
+/// R-20 Package 1. Carries no category and quotes no term: a player is told
+/// their text is not allowed, never which list it matched, and the moderation
+/// internals never reach the UI.
+class ContentRejectedException extends GameException {
+  ContentRejectedException()
+    : super('Content not allowed', code: 'CONTENT_NOT_ALLOWED');
+
+  @override
+  String toString() => 'ContentRejectedException: $message';
+}
+
 /// Thrown when monetization limits are reached
 class MonetizationException extends GameException {
   MonetizationException(super.message, {super.code});

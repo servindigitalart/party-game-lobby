@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import '../../core/exceptions.dart';
+import '../../core/moderation/content_filter.dart';
 import '../../models/game_phase.dart';
 import '../../models/player.dart';
 import '../../models/room.dart';
@@ -189,6 +190,10 @@ class PracticeRoomRepository implements RoomRepository {
 
   @override
   Future<Room> createRoom(String code, String hostId, String hostName) async {
+    // The same policy as multiplayer, deliberately. Filtering is a property
+    // of the input, not of the mode — a Practice-only exemption would be the
+    // conditional behaviour R-21's non-goals forbid.
+    ContentFilter.instance.enforce(hostName);
     // Three players from the first frame: the human as host, and the two
     // bufones as ordinary participants. Nothing downstream has to know they
     // are simulated — they are `Player`s like any other.
@@ -264,6 +269,7 @@ class PracticeRoomRepository implements RoomRepository {
     String playerId,
     String answer,
   ) async {
+    ContentFilter.instance.enforce(answer);
     final room = _current;
     final player = _playerOrNull(room, playerId);
     if (player == null) {

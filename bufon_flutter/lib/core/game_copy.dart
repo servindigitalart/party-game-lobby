@@ -130,6 +130,15 @@ class GameCopy {
   /// enforces it for this room.
   static const removedCannotRejoin = 'No puedes volver a entrar a esta sala.';
 
+  /// Shown when the objectionable-content policy refuses a name or an answer
+  /// (R-20 Package 1).
+  ///
+  /// Says nothing about which category matched and quotes no term — a player
+  /// is told to try something else, not shown the moderation internals. The
+  /// tone is deliberately unaccusatory: Bufón allows crude humour, so this
+  /// fires on a narrow set and should read as a nudge, not a rebuke.
+  static const contentNotAllowed = 'Eso no se puede usar aquí. Prueba con otra cosa.';
+
   static const revealingAnswers = 'Revelando respuestas...';
   static const countingVotes = 'Contando votos...';
   static const nextRound = 'Siguiente ronda...';
