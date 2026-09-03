@@ -33,7 +33,14 @@ import 'room_repository.dart';
 /// authentication is required, and no Cloud Function is called. A Practice
 /// game runs on a plane.
 class PracticeRoomRepository implements RoomRepository {
-  PracticeRoomRepository();
+  PracticeRoomRepository() {
+    // WP27. Mirrors `ConnectionService.startHeartbeat`'s exact pattern — an
+    // immediate beat, then a periodic one every 10 seconds — but entirely in
+    // memory: no Firestore write, no `ConnectionService`. See `_refreshPresence`.
+    _refreshPresence();
+    _presenceTimer =
+        Timer.periodic(_presenceRefreshInterval, (_) => _refreshPresence());
+  }
 
   /// The two simulated players. Fixed ids and names: a Practice game is
   /// reproducible, so a bug found in one is findable again in the next.
@@ -75,6 +82,46 @@ class PracticeRoomRepository implements RoomRepository {
     'La foto que nadie quería que existiera',
     'Un microondas con vida propia',
   ];
+
+  /// WP27 — Practice Mode local presence consistency.
+  ///
+  /// **The defect.** `Player.isDisconnected` (`player.dart:24-27`) trips 20 s
+  /// after a stale `lastSeen`. Real multiplayer never crosses that threshold
+  /// because `ConnectionService.startHeartbeat` rewrites `lastSeen` every 10 s.
+  /// This class set `lastSeen` once, at [createRoom], and never again — so a
+  /// Practice room's own players quietly became "disconnected" mid-session,
+  /// `PlayerEligibility.eligible` (`player.dart:101`) emptied out, and
+  /// `voting_screen.dart`'s `allVoted` gate could never become true again.
+  /// Confirmed on a physical device: Voting was entered 18 s after room
+  /// creation and never advanced.
+  ///
+  /// **The fix, and why it lives here.** `player.dart`, `voting_screen.dart`
+  /// and `game_screen.dart` are the shared, mode-agnostic contract every
+  /// screen already trusts — narrowing or bypassing `isDisconnected` there
+  /// would be a second, competing presence rule for the very predicate WP22
+  /// hardened for multiplayer. Practice instead honours that contract
+  /// locally: the same 20 s threshold, refreshed at the same 10 s cadence
+  /// multiplayer already uses, entirely in memory. Nothing outside this file
+  /// changes; a Practice room's players simply never go stale.
+  static const Duration _presenceRefreshInterval = Duration(seconds: 10);
+  Timer? _presenceTimer;
+
+  /// Refreshes every current player's `lastSeen` to now. A no-op before a
+  /// room exists (the constructor's immediate call, mirroring
+  /// `ConnectionService.startHeartbeat`'s "send immediate heartbeat") and
+  /// after [deleteRoom] — there is nothing to keep present.
+  void _refreshPresence() {
+    final room = _room;
+    if (room == null) return;
+    final now = DateTime.now();
+    _publish(
+      room.copyWith(
+        players: [
+          for (final player in room.players) player.copyWith(lastSeen: now),
+        ],
+      ),
+    );
+  }
 
   Room? _room;
   final StreamController<Room?> _rooms = StreamController<Room?>.broadcast();
@@ -436,8 +483,12 @@ class PracticeRoomRepository implements RoomRepository {
     if (!_rooms.isClosed) _rooms.add(null);
   }
 
-  /// Releases the stream. The provider owns the lifecycle.
+  /// Releases the stream and stops the local presence heartbeat (WP27). The
+  /// provider owns the lifecycle: `game_providers.dart` wires this to
+  /// `ref.onDispose`, which fires whenever `practiceModeProvider` leaves
+  /// Practice — so the timer never outlives a Practice session.
   void dispose() {
+    _presenceTimer?.cancel();
     if (!_rooms.isClosed) _rooms.close();
   }
 }

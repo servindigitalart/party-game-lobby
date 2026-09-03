@@ -26,6 +26,7 @@ import 'package:bufon_flutter/presentation/widgets/animated_primary_button.dart'
 import 'package:bufon_flutter/presentation/widgets/season_countdown_banner.dart';
 import 'package:bufon_flutter/providers/season_providers.dart';
 import 'package:bufon_flutter/screens/lobby_screen.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -236,6 +237,129 @@ void main() {
               roomCode: 'PRAC01', questionId: 'q$round', questionText: 'q');
         }
       }
+    });
+  });
+
+  group('WP27 — Practice players stay eligible past the real 20s threshold',
+      () {
+    // The regression this file did not have: every existing Practice test
+    // completes a full game in well under 20 seconds of real time, so
+    // `Player.isDisconnected`'s real, unmodified 20s threshold (`player.dart`)
+    // never had a chance to trip. This is the one that reproduces the actual
+    // physical-device failure — Voting entered, then stuck forever — and
+    // fails without WP27's fix.
+    test(
+        'a lastSeen aged past the real threshold is corrected by the '
+        'periodic refresh, and Voting can still complete', () {
+      fakeAsync((async) {
+        final repo = PracticeRoomRepository();
+        addTearDown(repo.dispose);
+
+        // `PracticeRoomRepository`'s methods are async but never truly await
+        // anything, so every call below resolves on the very next microtask.
+        // `capture` drains that queue and hands back the settled `Room`,
+        // without needing this callback itself to be `async` (fakeAsync's
+        // Timer control only applies to code running synchronously inside
+        // it).
+        Room? snapshot;
+        Room capture() {
+          repo.getRoom('PRAC01').then((r) => snapshot = r);
+          async.flushMicrotasks();
+          return snapshot!;
+        }
+
+        repo.createRoom('PRAC01', _humanId, 'Sofía');
+        async.flushMicrotasks();
+        repo.startFirstRound(
+          roomCode: 'PRAC01',
+          questionId: 'q1',
+          questionText: '¿Qué es lo más ridículo que has hecho?',
+        );
+        async.flushMicrotasks();
+        repo.submitAnswerTransaction('PRAC01', _humanId, 'Mi respuesta');
+        async.flushMicrotasks();
+        repo.moveToVoting('PRAC01');
+        async.flushMicrotasks();
+        // The human votes, and — same beat, same as production — so do both
+        // bufones. All three ballots are genuinely cast before staleness is
+        // ever introduced below.
+        repo.submitVoteTransaction(
+            'PRAC01', _humanId, PracticeRoomRepository.botOneId);
+        async.flushMicrotasks();
+        expect(capture().players.every((p) => p.votedFor != null), isTrue,
+            reason: 'sanity check — every player really did vote');
+
+        // Reproduce the exact pre-WP27 failure state on top of those real
+        // votes: every player's lastSeen aged past the real 20s threshold,
+        // the same way an unrefreshed Practice room drifted on the physical
+        // device. This is a genuinely stale, real DateTime — not a virtual
+        // one — so it trips `Player.isDisconnected` regardless of how this
+        // test's own clock is later advanced.
+        final stale = DateTime.now().subtract(const Duration(seconds: 25));
+        final beforeFix = capture();
+        repo.updateRoom(
+          beforeFix.copyWith(
+            players: [
+              for (final p in beforeFix.players) p.copyWith(lastSeen: stale),
+            ],
+          ),
+        );
+        async.flushMicrotasks();
+
+        final stalled = capture();
+        expect(
+          stalled.players.every((p) => p.isDisconnected),
+          isTrue,
+          reason: 'sanity check — the real, unmodified 20s threshold in '
+              'player.dart really does trip on an unrefreshed timestamp; '
+              'this is the exact state that froze Voting on-device',
+        );
+        expect(stalled.players.eligible, isEmpty,
+            reason: 'sanity check — every voted player just became '
+                'uncountable; this is what made allVoted permanently '
+                'unreachable before WP27, even with real votes on record');
+
+        // Advance past WP27's 10s local heartbeat cadence — twice, past the
+        // full 20s threshold, exactly as the work package asks. The fake
+        // Timer.periodic this constructs fires for real; only the wait is
+        // virtual, so the test stays fast and deterministic.
+        async.elapse(const Duration(seconds: 25));
+
+        final corrected = capture();
+        expect(
+          corrected.players.every((p) => !p.isDisconnected),
+          isTrue,
+          reason: 'WP27: the local heartbeat must correct staleness before '
+              'the real threshold in player.dart trips',
+        );
+
+        // Exactly voting_screen.dart's allVoted formula (voting_screen.dart
+        // ~235-238), computed from the same PlayerEligibility.eligible this
+        // test just proved is populated again. Not a widget test — a direct
+        // check, against real production code, that the shared completion
+        // gate the screen itself evaluates is satisfied.
+        final eligible = corrected.players.eligible.toList();
+        final votedCount = eligible.where((p) => p.votedFor != null).length;
+        final allVoted = eligible.isNotEmpty && votedCount == eligible.length;
+        expect(eligible, hasLength(3),
+            reason: 'all three Practice players, human and bufones alike, '
+                'must still be counted');
+        expect(allVoted, isTrue,
+            reason: 'Voting must be able to complete — this is exactly the '
+                'condition that stayed false forever on-device');
+      });
+    });
+
+    test('dispose() cancels the local heartbeat — no leaked timer', () {
+      fakeAsync((async) {
+        final repo = PracticeRoomRepository();
+        expect(async.pendingTimers.length, greaterThan(0),
+            reason: 'the periodic presence timer starts at construction');
+        repo.dispose();
+        expect(async.pendingTimers.length, 0,
+            reason: 'dispose() must cancel it — nothing may keep firing '
+                'after Practice ends');
+      });
     });
   });
 
