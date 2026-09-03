@@ -2,7 +2,7 @@ name: bufon_flutter
 description: "BUFÓN - Multiplayer party game MVP"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.8.1
