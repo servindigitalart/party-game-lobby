@@ -241,6 +241,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           return 'Esa sala ya está llena.';
         case 'GAME_ALREADY_STARTED':
           return 'Esa partida ya empezó.';
+        // R-20 Package 2. A prevention claim, made only because `joinRoom`
+        // genuinely enforces it for this room.
+        case 'PLAYER_REMOVED':
+          return GameCopy.removedCannotRejoin;
         case 'ROOM_EXISTS':
           return 'No pudimos crear sala. Intenta de nuevo.';
       }

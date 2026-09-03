@@ -36,6 +36,22 @@ class Room {
   /// it exists to reduce is measured *"over two games"*.
   final List<String> usedQuestionIds;
 
+  /// Players the host has removed from this room.
+  ///
+  /// R-20 Package 2. Room-scoped and nothing more: this is not a block list,
+  /// not an account flag, and not visible outside the room it belongs to. A
+  /// room lives for minutes and then is deleted, and this list dies with it.
+  ///
+  /// It exists because deleting a player document is not by itself a removal —
+  /// `RoomRepository.joinRoom` would happily let the same uid straight back
+  /// in. The uid recorded here is what `joinRoom` refuses.
+  ///
+  /// **What it cannot do**, stated because the copy must not overclaim:
+  /// identity is anonymous and per-install, so a determined person who
+  /// reinstalls arrives as a different uid and is not covered. See
+  /// `R20_R23_IMPLEMENTATION_SPEC.md` §2.3.
+  final List<String> removedPlayerIds;
+
   // Room-based monetization fields
   final int gamesPlayedToday;
   final int adUnlocksRemaining;
@@ -57,6 +73,7 @@ class Room {
     // deadlocks are closed — was satisfied by WP22.
     this.roundDuration = 60,
     this.usedQuestionIds = const [],
+    this.removedPlayerIds = const [],
     DateTime? createdAt,
     this.gamesPlayedToday = 0,
     this.adUnlocksRemaining = 0,
@@ -76,6 +93,7 @@ class Room {
     'roundStartTime': roundStartTime?.toIso8601String(),
     'roundDuration': roundDuration,
     'usedQuestionIds': usedQuestionIds,
+    'removedPlayerIds': removedPlayerIds,
     'createdAt': createdAt.toIso8601String(),
     'gamesPlayedToday': gamesPlayedToday,
     'adUnlocksRemaining': adUnlocksRemaining,
@@ -111,6 +129,13 @@ class Room {
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      // Same fallback shape as `usedQuestionIds`: a room written before this
+      // field existed deserializes to an empty list and needs no migration.
+      removedPlayerIds:
+          (json['removedPlayerIds'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
@@ -135,6 +160,7 @@ class Room {
     DateTime? roundStartTime,
     int? roundDuration,
     List<String>? usedQuestionIds,
+    List<String>? removedPlayerIds,
     DateTime? createdAt,
     int? gamesPlayedToday,
     int? adUnlocksRemaining,
@@ -152,6 +178,7 @@ class Room {
     roundStartTime: roundStartTime ?? this.roundStartTime,
     roundDuration: roundDuration ?? this.roundDuration,
     usedQuestionIds: usedQuestionIds ?? this.usedQuestionIds,
+    removedPlayerIds: removedPlayerIds ?? this.removedPlayerIds,
     createdAt: createdAt ?? this.createdAt,
     gamesPlayedToday: gamesPlayedToday ?? this.gamesPlayedToday,
     adUnlocksRemaining: adUnlocksRemaining ?? this.adUnlocksRemaining,

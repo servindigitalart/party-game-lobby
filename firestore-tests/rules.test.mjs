@@ -733,3 +733,113 @@ test('B1: the round reset still works and grants no score', async () => {
     })
   );
 });
+
+// ---------------------------------------------------------------------------
+// R-20 Package 2 — host player removal and the room-scoped rejoin bar.
+//
+// `removedPlayerIds` is the list `joinRoom` refuses, which makes it the one
+// field in the room document that must not be writable by the person it
+// names. These tests are the security boundary: without them the guard is a
+// client-side suggestion, and the copy that describes it would be untrue.
+// ---------------------------------------------------------------------------
+
+test('removedPlayerIds: the host may append a uid', async () => {
+  await seedRoom('RM0001', baseRoom(), [basePlayer(HOST), basePlayer(P2)]);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertSucceeds(
+    updateDoc(doc(db, 'rooms', 'RM0001'), { removedPlayerIds: [P2] }),
+  );
+});
+
+test('removedPlayerIds: a non-host member cannot append', async () => {
+  await seedRoom('RM0002', baseRoom(), [basePlayer(HOST), basePlayer(P2)]);
+  const db = testEnv.authenticatedContext(P2).firestore();
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'RM0002'), { removedPlayerIds: [HOST] }),
+  );
+});
+
+test('removedPlayerIds: an outsider cannot append', async () => {
+  await seedRoom('RM0003', baseRoom(), [basePlayer(HOST), basePlayer(P2)]);
+  const db = testEnv.authenticatedContext(OUTSIDER).firestore();
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'RM0003'), { removedPlayerIds: [P2] }),
+  );
+});
+
+test('removedPlayerIds: the removed player cannot clear their own uid', async () => {
+  // The attack the whole rule exists for. P2 has been removed; if they can
+  // rewrite the list to [], joinRoom lets them straight back in.
+  await seedRoom('RM0004', baseRoom({ removedPlayerIds: [P2] }), [
+    basePlayer(HOST),
+  ]);
+  const db = testEnv.authenticatedContext(P2).firestore();
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'RM0004'), { removedPlayerIds: [] }),
+  );
+});
+
+test('removedPlayerIds: not even the host may drop an existing entry', async () => {
+  // Append-only. A host who could shorten the list could also be talked into
+  // shortening it, and the guarantee would depend on their judgement.
+  await seedRoom('RM0005', baseRoom({ removedPlayerIds: [P2, OUTSIDER] }), [
+    basePlayer(HOST),
+  ]);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'RM0005'), { removedPlayerIds: [P2] }),
+  );
+});
+
+test('removedPlayerIds: the host may append to an existing list', async () => {
+  await seedRoom('RM0006', baseRoom({ removedPlayerIds: [P2] }), [
+    basePlayer(HOST),
+  ]);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertSucceeds(
+    updateDoc(doc(db, 'rooms', 'RM0006'), {
+      removedPlayerIds: [P2, OUTSIDER],
+    }),
+  );
+});
+
+test('removedPlayerIds: a room written before the field existed still accepts a first removal', async () => {
+  // `resource.data.get('removedPlayerIds', [])` is what makes this evaluate
+  // rather than error on a document that has no such key.
+  const legacy = baseRoom();
+  delete legacy.removedPlayerIds;
+  await seedRoom('RM0007', legacy, [basePlayer(HOST), basePlayer(P2)]);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertSucceeds(
+    updateDoc(doc(db, 'rooms', 'RM0007'), { removedPlayerIds: [P2] }),
+  );
+});
+
+test('removedPlayerIds: the host may remove a player and decrement the count together', async () => {
+  // The shape RoomRepository.removePlayer actually writes.
+  await seedRoom('RM0008', baseRoom({ playerCount: 3 }), [
+    basePlayer(HOST),
+    basePlayer(P2),
+  ]);
+  const db = testEnv.authenticatedContext(HOST).firestore();
+  await assertSucceeds(
+    updateDoc(doc(db, 'rooms', 'RM0008'), {
+      playerCount: 2,
+      removedPlayerIds: [P2],
+    }),
+  );
+});
+
+test('removedPlayerIds: a non-host cannot smuggle it alongside a legitimate field', async () => {
+  await seedRoom('RM0009', baseRoom({ playerCount: 3 }), [
+    basePlayer(HOST),
+    basePlayer(P2),
+  ]);
+  const db = testEnv.authenticatedContext(P2).firestore();
+  await assertFails(
+    updateDoc(doc(db, 'rooms', 'RM0009'), {
+      playerCount: 2,
+      removedPlayerIds: [HOST],
+    }),
+  );
+});

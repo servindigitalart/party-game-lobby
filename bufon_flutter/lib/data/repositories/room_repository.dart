@@ -343,6 +343,7 @@ class RoomRepository {
         }
 
         final room = Room.fromJson(roomSnapshot.data()!);
+
         if (room.phase != GamePhase.lobby) {
           throw RoomException(
             'Game already started',
@@ -747,6 +748,22 @@ class RoomRepository {
         }
 
         final room = Room.fromJson(roomSnapshot.data()!);
+
+        // R-20 Package 2. Checked first, and before any mutation: the room is
+        // already deserialized here, so the guard costs no extra read, and
+        // nothing below this point has yet created a player document or moved
+        // `playerCount`.
+        //
+        // This is room-scoped only. It refuses the uid the host removed from
+        // *this* room; it is not a block list and knows nothing about any
+        // other room.
+        if (room.removedPlayerIds.contains(player.id)) {
+          throw RoomException(
+            'You were removed from this room',
+            code: 'PLAYER_REMOVED',
+          );
+        }
+
         if (room.phase != GamePhase.lobby) {
           throw RoomException(
             'Game already started',
@@ -778,6 +795,86 @@ class RoomRepository {
       throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
     }
     return room;
+  }
+
+  /// Removes a player from a room at the host's request.
+  ///
+  /// **R-20 Package 2.** Apple's Guideline 1.2 asks for *"the ability to block
+  /// abusive users from the service"*. Bufón has no service to be blocked
+  /// from — no accounts, no discovery, no stranger contact — so the honest
+  /// equivalent is this: the host removes someone from the room they are in,
+  /// and that room refuses them afterwards.
+  ///
+  /// **Why one transaction.** `joinRoom` returns early, *outside* its own
+  /// transaction, whenever the caller already has a player document. Recording
+  /// the uid without deleting the document would therefore be inert — the
+  /// removed player would take that early return and walk straight back in.
+  /// Deleting without recording would let them rejoin as a new arrival. Both
+  /// halves have to land together or neither is a removal.
+  ///
+  /// Host-only, and enforced twice: here, and in `firestore.rules`, so a
+  /// modified client cannot record a removal it is not entitled to.
+  Future<void> removePlayer({
+    required String roomCode,
+    required String hostId,
+    required String playerId,
+  }) async {
+    if (hostId == playerId) {
+      throw RoomException(
+        'The host cannot remove themselves',
+        code: 'CANNOT_REMOVE_SELF',
+      );
+    }
+
+    final roomRef = _firestore.collection('rooms').doc(roomCode);
+    final playerRef = _playersCollection(roomCode).doc(playerId);
+
+    await _transaction('remove_player', () async {
+      return _firestore.runTransaction((transaction) async {
+        final roomSnapshot = await transaction.get(roomRef);
+        if (!roomSnapshot.exists) {
+          throw RoomException('Room not found', code: 'ROOM_NOT_FOUND');
+        }
+
+        final room = Room.fromJson(roomSnapshot.data()!);
+        if (room.hostId != hostId) {
+          throw RoomException(
+            'Only the host can remove a player',
+            code: 'NOT_HOST',
+          );
+        }
+
+        final playerSnapshot = await transaction.get(playerRef);
+        if (!playerSnapshot.exists) {
+          throw RoomException('Player not found', code: 'PLAYER_NOT_FOUND');
+        }
+
+        // Built explicitly rather than with `FieldValue.arrayUnion`, for two
+        // reasons: the append-only security rule compares the proposed list
+        // against the stored one, and a transform is not a list at rule
+        // evaluation time; and building it here makes the de-duplication
+        // visible instead of implied.
+        final removed = room.removedPlayerIds.contains(playerId)
+            ? room.removedPlayerIds
+            : [...room.removedPlayerIds, playerId];
+
+        final playerCount =
+            (roomSnapshot.data()?['playerCount'] as int?) ??
+            room.players.length;
+
+        transaction.delete(playerRef);
+        transaction.update(roomRef, {
+          'playerCount': playerCount > 0 ? playerCount - 1 : 0,
+          'removedPlayerIds': removed,
+        });
+      });
+    });
+
+    _telemetry.track(
+      AppLogCategory.room,
+      'player_removed',
+      payload: {'room_code': roomCode},
+    );
   }
 
   /// Clean up disconnected players atomically

@@ -106,6 +106,30 @@ class GameCopy {
       'Juega una partida completa contra dos bufones simulados.';
   static const practiceHumanName = 'Tú';
 
+  /// Host player removal (R-20 Package 2 / Apple Guideline 1.2).
+  ///
+  /// The wording is deliberately narrow. Bufón can guarantee that a removed
+  /// player cannot rejoin *this room* — `joinRoom` refuses the uid and
+  /// `firestore.rules` keeps the list append-only and host-only. It cannot
+  /// guarantee anything about a fresh install or another device, because
+  /// identity is anonymous by design. So the copy says "esta sala", never
+  /// "the game", and never anything permanent.
+  static const removePlayerAction = 'Sacar de la sala';
+  static const removePlayerTitle = '¿Sacar a este jugador?';
+  static const removePlayerBody = 'Ya no podrá participar en esta sala.';
+  static const removePlayerConfirm = 'Sacar';
+  static const removePlayerCancel = 'Cancelar';
+  static const removePlayerFailed = 'No se pudo sacar al jugador.';
+
+  /// Shown to the player who was removed. States what happened; claims
+  /// nothing about the future.
+  static const removedFromRoom = 'Te sacaron de esta sala.';
+
+  /// Shown when a removed player tries this room again. This one *is* a
+  /// prevention claim, and it is only used because `joinRoom` genuinely
+  /// enforces it for this room.
+  static const removedCannotRejoin = 'No puedes volver a entrar a esta sala.';
+
   static const revealingAnswers = 'Revelando respuestas...';
   static const countingVotes = 'Contando votos...';
   static const nextRound = 'Siguiente ronda...';

@@ -383,6 +383,28 @@ class PracticeRoomRepository implements RoomRepository {
     return true;
   }
 
+  /// Not available in Practice, and the throw is the honest answer.
+  ///
+  /// R-20 Package 2 added this to the repository interface, so this class has
+  /// to satisfy it — but a Practice room holds one human and two bufones. The
+  /// human is the host and cannot remove themselves, and the bufones are
+  /// first-party constants, not people. Removing one would also break the
+  /// three-player minimum Practice exists to satisfy honestly.
+  ///
+  /// **Practice's product contract is unchanged by this package.** The lobby
+  /// never offers the control here, because the only other rows are bots.
+  @override
+  Future<void> removePlayer({
+    required String roomCode,
+    required String hostId,
+    required String playerId,
+  }) async {
+    throw RoomException(
+      'Players cannot be removed in Practice',
+      code: 'NOT_SUPPORTED',
+    );
+  }
+
   @override
   Future<Room?> cleanupDisconnectedPlayers(String roomCode) async {
     // Nobody disconnects in Practice: the bufones are local and the human is

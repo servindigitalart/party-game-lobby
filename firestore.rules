@@ -76,7 +76,22 @@ service cloud.firestore {
         // Blocks jumping straight to an arbitrary large value.
         && (!changedKeys().hasAny(['adUnlocksRemaining']) ||
             request.resource.data.adUnlocksRemaining == resource.data.adUnlocksRemaining + 1 ||
-            request.resource.data.adUnlocksRemaining == resource.data.adUnlocksRemaining - 1);
+            request.resource.data.adUnlocksRemaining == resource.data.adUnlocksRemaining - 1)
+        // R-20 Package 2. removedPlayerIds is the list joinRoom refuses, so
+        // it is the one thing in this document that must not be writable by
+        // the person it names. Host-only and append-only:
+        //
+        //   * host-only, or any member could banish anyone;
+        //   * append-only, or a removed player clears their own uid and walks
+        //     back in — which would make the guard, and the copy that
+        //     describes it, untrue.
+        //
+        // `get(..., [])` because rooms created before this field existed
+        // carry no key, and a plain read would error rather than evaluate.
+        && (!changedKeys().hasAny(['removedPlayerIds']) ||
+            (request.auth.uid == resource.data.hostId &&
+             request.resource.data.removedPlayerIds
+               .hasAll(resource.data.get('removedPlayerIds', []))));
 
       // Only host can delete room
       allow delete: if isAuthenticated()

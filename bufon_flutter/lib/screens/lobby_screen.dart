@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/player.dart';
 import '../models/game_phase.dart';
 import '../providers/game_providers.dart';
 import '../core/exceptions.dart';
@@ -72,6 +73,63 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     _copyResetTimer = Timer(const Duration(seconds: 2), () {
       if (mounted) setState(() => _codeCopied = false);
     });
+  }
+
+  /// The player currently being removed, so a second tap cannot start a
+  /// second transaction while the first is in flight.
+  String? _removingPlayerId;
+
+  /// R-20 Package 2. Confirm, then remove.
+  ///
+  /// The confirmation is not ceremony: removal deletes another person's
+  /// player document and bars them from the room, and the host should have to
+  /// mean it.
+  Future<void> _confirmRemove(
+    String roomCode,
+    String hostId,
+    Player target,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(GameCopy.removePlayerTitle),
+        content: Text('${target.name}. ${GameCopy.removePlayerBody}'),
+        actions: [
+          AnimatedPrimaryButton(
+            text: GameCopy.removePlayerCancel,
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            variant: PrimaryButtonVariant.outline,
+          ),
+          AnimatedPrimaryButton(
+            text: GameCopy.removePlayerConfirm,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _removingPlayerId = target.id);
+    try {
+      await ref
+          .read(roomRepositoryProvider)
+          .removePlayer(
+            roomCode: roomCode,
+            hostId: hostId,
+            playerId: target.id,
+          );
+    } catch (e, stackTrace) {
+      _telemetry.fail(
+        AppLogCategory.room,
+        'player_remove_failed',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      if (mounted) BufonFeedback.show(context, GameCopy.removePlayerFailed);
+    } finally {
+      if (mounted) setState(() => _removingPlayerId = null);
+    }
   }
 
   Future<void> _performCleanup() async {
@@ -228,6 +286,21 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
           return const Scaffold(body: Center(child: BufonLoader()));
         }
 
+        // R-20 Package 2. The host removed this player, so their own client
+        // stops presenting a room they are no longer in.
+        //
+        // Keyed on `removedPlayerIds`, deliberately, rather than on "am I
+        // still in room.players". The looser test would also fire when
+        // `cleanupDisconnectedPlayers` evicts someone for a lapsed heartbeat,
+        // which is a different event with different copy — and WP25 owns that
+        // behaviour. This fires only for an actual removal.
+        if (userId != null && room.removedPlayerIds.contains(userId)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _navigateToHomeWithMessage(GameCopy.removedFromRoom);
+          });
+          return const Scaffold(body: Center(child: BufonLoader()));
+        }
+
         // Navigate to game if already started
         if (room.phase != GamePhase.lobby) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -368,6 +441,22 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                                       ),
                                     ),
                                     backgroundColor: AppColors.butter,
+                                  )
+                                // R-20 Package 2. Offered to the host, on
+                                // everyone but themselves. Not a moderation
+                                // screen — one control, where the players
+                                // already are.
+                                : (isHost && player.id != userId)
+                                ? IconButton(
+                                    icon: const Icon(Icons.person_remove),
+                                    tooltip: GameCopy.removePlayerAction,
+                                    onPressed: _removingPlayerId != null
+                                        ? null
+                                        : () => _confirmRemove(
+                                            room.code,
+                                            userId!,
+                                            player,
+                                          ),
                                   )
                                 : null,
                           ),
