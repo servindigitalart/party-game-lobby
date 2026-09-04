@@ -21,7 +21,11 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.bufon.bufon_flutter"
-    compileSdk = flutter.compileSdkVersion
+    // compileSdk and targetSdk are pinned to 36 for Google Play, which
+    // requires target API 36 for submissions from 2026-08-31. Flutter 3.38.7
+    // currently defaults to 36 as well, so the pin is belt-and-braces rather
+    // than an override.
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -38,8 +42,12 @@ android {
         applicationId = "com.bufon.bufon_flutter"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23  // Firebase requires API 23+
-        targetSdk = flutter.targetSdkVersion
+        // Inherited, not pinned: Flutter 3.38.7 sets this to 24 and migrates
+        // any lower literal on build. The previous `23` and its "Firebase
+        // requires API 23+" note are gone because neither is true any more —
+        // 24 satisfies Firebase, and the value is no longer ours to state.
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
