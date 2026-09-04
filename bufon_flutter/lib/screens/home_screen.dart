@@ -1,6 +1,7 @@
 // screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/repositories/practice_room_repository.dart';
 import '../providers/game_providers.dart';
 import '../core/telemetry/game_telemetry_service.dart';
@@ -271,6 +272,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     context.pushFadeSlide(const LeaderboardScreen());
   }
 
+  /// R-23's legal half. Opens the public Privacy Policy in the system
+  /// browser — no WebView, no in-app browser — exactly as `url_launcher`'s
+  /// `LaunchMode.externalApplication` is built to do.
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(GameCopy.privacyPolicyUrl);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      _showError('No se pudo abrir la Política de Privacidad.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Fase 3D put Home on the Butter Bliss light register (Capítulo 30 — "la
@@ -347,10 +359,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         // before anyone commits to creating a room — R-21's
                         // scope asks for exactly that.
                         //
-                        // The *legal* half of R-23 is deliberately absent: it
-                        // depends on the privacy-policy URL, which R-23's own
-                        // BLOCK field names as an App Store Connect fact
-                        // (R-15), and WP18 has recovered none of its facts.
+                        // R-23's legal half — the Privacy Policy link — lives
+                        // at the bottom of this column, below the season
+                        // banner, once the app's other primary actions are
+                        // out of the way. See `_PrivacyPolicyLink` below.
                         Text(
                           GameCopy.playersRequired,
                           style: AppTypography.caption.copyWith(
@@ -414,6 +426,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         // stops out-competing the brand for attention on the
                         // first screen (Capítulo 3 ley 4).
                         const SeasonCountdownBanner(),
+                        const SizedBox(height: AppSpacing.lg),
+                        // R-23's legal half. Lowest-weight affordance on the
+                        // screen, deliberately — below the season banner —
+                        // but still one tap away from launch, for App Review
+                        // and for players alike.
+                        _PrivacyPolicyLink(onPressed: _openPrivacyPolicy),
                       ],
                     ),
                   ),
@@ -476,6 +494,41 @@ class _PracticeEntry extends StatelessWidget {
               style: AppTypography.body2.copyWith(color: phase.onSurfaceMuted),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Home's Privacy Policy entry (R-23's legal half).
+///
+/// A single line of muted, underlined text — the lowest visual weight on the
+/// screen, below the season banner, on purpose: it must be reachable by App
+/// Review and by anyone who wants it, without competing with "Crear Sala"
+/// for attention. No card, no icon, no dialog.
+class _PrivacyPolicyLink extends StatelessWidget {
+  const _PrivacyPolicyLink({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          minimumSize: const Size(44, 44),
+        ),
+        child: Text(
+          GameCopy.privacyPolicyLabel,
+          style: AppTypography.caption.copyWith(
+            color: AppColors.inkMuted,
+            decoration: TextDecoration.underline,
+          ),
         ),
       ),
     );

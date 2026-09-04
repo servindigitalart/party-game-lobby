@@ -95,6 +95,12 @@ class GameCopy {
   // repository — "nothing tells the reviewer the game needs 3 people".
   static const playersRequired = 'Se juega de 3 a 8 personas, cada quien en su celular.';
 
+  /// R-23's other half. The comment above once said this depended on a
+  /// privacy-policy URL no WP had recovered; the Netlify page now exists, so
+  /// this is that fact.
+  static const privacyPolicyLabel = 'Política de Privacidad';
+  static const privacyPolicyUrl = 'https://bufon-privacy.netlify.app';
+
   /// Practice Mode's Home entry (PD-12(c)).
   ///
   /// Honest product copy. Bufón is a game for three to eight people and says

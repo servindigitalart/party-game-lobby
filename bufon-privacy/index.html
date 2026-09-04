@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bufón — Política de Privacidad / Privacy Policy</title>
+<meta name="description" content="Política de privacidad de Bufón. / Bufón's privacy policy." />
+<meta name="robots" content="noindex" />
+<style>
+  /* ---------------------------------------------------------------------
+     Bufón — verified "Butter Bliss" tokens, copied from
+     bufon_flutter/lib/core/theme/app_colors.dart, app_shapes.dart and
+     app_spacing.dart. Nothing below is invented; the legacy dark "casino"
+     palette from the same file was deliberately not used here.
+     --------------------------------------------------------------------- */
+  :root {
+    --paper: #FAFAF7;
+    --paper-line: #E4DFCF;
+    --ink: #191919;
+    --ink-muted: #5C574C;
+    --butter: #F8EE67;
+    --butter-shade: #D9C92A;
+
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --radius-card: 20px;
+    --hairline: 1px;
+
+    --measure: 42em; /* comfortable reading line length for long legal text */
+  }
+
+  /* Plus Jakarta Sans, bundled locally under an SIL Open Font License 1.1
+     that explicitly permits redistribution — see assets/fonts/OFL.txt.
+     Loaded from this page's own assets rather than a CDN, so the page has
+     zero external network dependencies, per the "no unnecessary external
+     resources" requirement. */
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    src: url("assets/fonts/PlusJakartaSans-400.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    src: url("assets/fonts/PlusJakartaSans-600.ttf") format("truetype");
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Plus Jakarta Sans";
+    src: url("assets/fonts/PlusJakartaSans-700.ttf") format("truetype");
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  * { box-sizing: border-box; }
+
+  html {
+    /* Fallback stack used only until the local font file loads; the page
+       never depends on any font being fetched from a third party. */
+    font-family: "Plus Jakarta Sans", -apple-system, "Segoe UI", Roboto,
+      Helvetica, Arial, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  img { max-width: 100%; display: block; }
+
+  a {
+    color: var(--ink);
+    text-decoration-color: var(--butter-shade);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+  a:hover { color: var(--ink-muted); }
+  a:focus-visible,
+  button:focus-visible {
+    outline: 3px solid var(--butter-shade);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--butter);
+    color: var(--ink);
+    padding: var(--space-sm) var(--space-md);
+    z-index: 10;
+    font-weight: 600;
+  }
+  .skip-link:focus {
+    left: var(--space-md);
+    top: var(--space-md);
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: var(--space-xl) var(--space-md) var(--space-xl);
+  }
+
+  header.masthead {
+    text-align: center;
+    padding: var(--space-xl) var(--space-md) var(--space-lg);
+    border-bottom: var(--hairline) solid var(--paper-line);
+  }
+  header.masthead img.isotype {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto var(--space-sm);
+  }
+  .wordmark {
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: 0.02em;
+    margin: 0;
+  }
+  .doc-title {
+    margin: var(--space-sm) 0 0;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--ink-muted);
+  }
+  .updated {
+    margin: var(--space-sm) 0 0;
+    font-size: 0.9rem;
+    color: var(--ink-muted);
+  }
+
+  nav.lang-switch {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-md) 0 0;
+    font-weight: 600;
+  }
+  nav.lang-switch a {
+    padding: var(--space-sm) var(--space-md);
+    border: var(--hairline) solid var(--paper-line);
+    border-radius: 999px;
+    text-decoration: none;
+  }
+  nav.lang-switch a:hover,
+  nav.lang-switch a:focus-visible {
+    background: var(--butter);
+    border-color: var(--butter-shade);
+  }
+  nav.lang-switch .sep {
+    color: var(--paper-line);
+    align-self: center;
+  }
+
+  main { display: block; }
+
+  .lang-section {
+    border-top: var(--hairline) solid var(--paper-line);
+  }
+  .lang-section h1 {
+    font-size: clamp(1.4rem, 1.1rem + 1vw, 1.9rem);
+    margin-top: 0;
+  }
+
+  nav.toc {
+    background: #fff;
+    border: var(--hairline) solid var(--paper-line);
+    border-radius: var(--radius-card);
+    padding: var(--space-lg);
+    margin: var(--space-lg) 0 var(--space-xl);
+  }
+  nav.toc h2 {
+    margin-top: 0;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+  }
+  nav.toc ol {
+    columns: 1;
+    margin: 0;
+    padding-left: 1.25em;
+  }
+  @media (min-width: 560px) {
+    nav.toc ol { columns: 2; column-gap: var(--space-lg); }
+  }
+  nav.toc li { margin-bottom: var(--space-sm); break-inside: avoid; }
+  nav.toc a { text-decoration: none; }
+  nav.toc a:hover, nav.toc a:focus-visible { text-decoration: underline; }
+
+  section.policy-section {
+    padding: var(--space-lg) 0;
+    border-bottom: var(--hairline) solid var(--paper-line);
+    scroll-margin-top: var(--space-lg);
+  }
+  section.policy-section:last-of-type { border-bottom: none; }
+  section.policy-section h2 {
+    font-size: 1.15rem;
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+  }
+  section.policy-section h2 .num {
+    color: var(--ink-muted);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+  section.policy-section p,
+  section.policy-section li {
+    max-width: var(--measure);
+  }
+  section.policy-section ul,
+  section.policy-section ol.plain {
+    padding-left: 1.25em;
+  }
+  section.policy-section li { margin-bottom: var(--space-sm); }
+
+  .card {
+    background: #fff;
+    border: var(--hairline) solid var(--paper-line);
+    border-radius: var(--radius-card);
+    padding: var(--space-lg);
+    margin: var(--space-md) 0;
+  }
+
+  .back-to-top {
+    display: inline-block;
+    margin-top: var(--space-lg);
+    font-size: 0.9rem;
+    color: var(--ink-muted);
+  }
+
+  footer.site-footer {
+    text-align: center;
+    padding: var(--space-xl) var(--space-md);
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+  }
+
+  strong { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#contenido">Saltar al contenido / Skip to content</a>
+
+<header class="masthead">
+  <img class="isotype" src="assets/isotype.png" alt="" />
+  <p class="wordmark">Bufón</p>
+  <p class="doc-title">Política de Privacidad · Privacy Policy</p>
+  <p class="updated">Última actualización: 3 de septiembre de 2026 · Last updated: September 3, 2026</p>
+  <nav class="lang-switch" aria-label="Selector de idioma / Language selector">
+    <a href="#es">Español</a>
+    <span class="sep" aria-hidden="true">|</span>
+    <a href="#en">English</a>
+  </nav>
+</header>
+
+<main id="contenido">
+
+  <!-- ======================================================= -->
+  <!-- SPANISH                                                  -->
+  <!-- ======================================================= -->
+  <section class="lang-section" id="es" lang="es">
+    <div class="wrap">
+      <h1>Política de Privacidad de Bufón</h1>
+      <p>Esta política describe qué información recopila la aplicación Bufón y cómo se utiliza. Bufón es un juego de fiesta y trivia para varios jugadores.</p>
+
+      <nav class="toc" aria-label="Tabla de contenido">
+        <h2>Contenido</h2>
+        <ol>
+          <li><a href="#es-1">Introducción</a></li>
+          <li><a href="#es-2">Información que recopilamos</a></li>
+          <li><a href="#es-3">Cómo utilizamos la información</a></li>
+          <li><a href="#es-4">Datos del juego y multijugador</a></li>
+          <li><a href="#es-5">Servicios de Firebase</a></li>
+          <li><a href="#es-6">Analítica</a></li>
+          <li><a href="#es-7">Diagnóstico y reportes de errores</a></li>
+          <li><a href="#es-8">Publicidad</a></li>
+          <li><a href="#es-9">Compras dentro de la aplicación</a></li>
+          <li><a href="#es-10">Seguridad y App Check</a></li>
+          <li><a href="#es-11">Compartición de datos y terceros</a></li>
+          <li><a href="#es-12">Conservación de datos</a></li>
+          <li><a href="#es-13">Solicitudes de eliminación</a></li>
+          <li><a href="#es-14">Privacidad de menores</a></li>
+          <li><a href="#es-15">Procesamiento internacional de datos</a></li>
+          <li><a href="#es-16">Cambios a esta política</a></li>
+          <li><a href="#es-17">Contacto</a></li>
+        </ol>
+      </nav>
+
+      <section class="policy-section" id="es-1">
+        <h2><span class="num">1.</span> Introducción</h2>
+        <p>Bufón ("nosotros") ofrece una aplicación de juego de fiesta y trivia multijugador. Esta Política de Privacidad aplica a la aplicación Bufón y describe, de forma precisa y conforme a su funcionamiento actual, qué información se recopila y cómo se utiliza.</p>
+        <p>Esta política explica cómo se recopila, utiliza, conserva y comparte la información cuando utiliza Bufón.</p>
+      </section>
+
+      <section class="policy-section" id="es-2">
+        <h2><span class="num">2.</span> Información que recopilamos</h2>
+        <p>Bufón recopila lo siguiente:</p>
+        <ul>
+          <li>Un identificador generado automáticamente por Firebase Authentication para su cuenta anónima de Bufón.</li>
+          <li>El nombre de jugador (apodo) que usted elige al crear o unirse a una sala.</li>
+          <li>Sus respuestas durante las rondas de juego.</li>
+          <li>Estadísticas de progreso: puntaje, experiencia (XP), nivel, partidas jugadas, victorias, votos recibidos, logros, avatares y títulos desbloqueados.</li>
+          <li>Información básica de la aplicación y el dispositivo (por ejemplo, plataforma, versión del sistema operativo y versión de la aplicación).</li>
+          <li>Reportes de fallas (crashes) y diagnóstico técnico.</li>
+          <li>Si realiza una compra dentro de la aplicación, datos de verificación de esa compra.</li>
+        </ul>
+        <p>Bufón <strong>no</strong> recopila, mediante su propio código, su nombre real, dirección de correo electrónico como campo de cuenta, número de teléfono, ubicación precisa, contactos, fotografías, acceso a cámara o micrófono, ni un identificador publicitario leído directamente por la aplicación. Esto no significa que Google, Firebase o Apple —como proveedores del servicio— no puedan procesar de forma independiente cierta información de red o dispositivo como parte normal de operar su propia infraestructura; véanse las secciones 5, 8 y 10.</p>
+      </section>
+
+      <section class="policy-section" id="es-3">
+        <h2><span class="num">3.</span> Cómo utilizamos la información</h2>
+        <p>Utilizamos la información recopilada para:</p>
+        <ul>
+          <li>Operar las salas multijugador y el modo de práctica.</li>
+          <li>Registrar su progreso y su posición en las tablas de clasificación.</li>
+          <li>Diagnosticar fallas y corregir errores.</li>
+          <li>Comprender el uso general de las funciones de la aplicación.</li>
+          <li>Verificar compras dentro de la aplicación.</li>
+          <li>Proteger el servicio contra abuso mediante verificación de integridad del dispositivo.</li>
+        </ul>
+      </section>
+
+      <section class="policy-section" id="es-4">
+        <h2><span class="num">4.</span> Datos del juego y multijugador</h2>
+        <p>Su nombre de jugador y sus respuestas son visibles para las demás personas en la misma sala mientras dura esa partida. Su nombre de jugador y sus estadísticas también pueden aparecer en tablas de clasificación públicas, bajo el apodo que usted eligió.</p>
+        <p>Las respuestas de texto libre pasan por un filtro de contenido automatizado antes de almacenarse. Esto es un filtro automatizado, no una revisión humana de cada respuesta.</p>
+      </section>
+
+      <section class="policy-section" id="es-5">
+        <h2><span class="num">5.</span> Servicios de Firebase</h2>
+        <p>Bufón utiliza Firebase, un conjunto de servicios de Google, para su infraestructura: Firebase Authentication (autenticación anónima), Cloud Firestore (base de datos) y Cloud Functions (lógica de servidor). Firebase es operado por Google.</p>
+        <p>Como ocurre con cualquier servicio en línea, la infraestructura de Google puede procesar de forma automática información técnica de la conexión (por ejemplo, la dirección IP) como parte normal de atender las solicitudes de la aplicación.</p>
+        <p>Más información: <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Privacidad en Firebase</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Política de Privacidad de Google</a>.</p>
+      </section>
+
+      <section class="policy-section" id="es-6">
+        <h2><span class="num">6.</span> Analítica</h2>
+        <p>Bufón utiliza Firebase Analytics para entender el uso de sus funciones. Los eventos de analítica se asocian a su identificador anónimo de Firebase, por lo que esta analítica es <strong>seudónima, no completamente anónima</strong>: el mismo identificador puede vincular su actividad entre distintas sesiones de uso de la aplicación.</p>
+        <p>Solo se envía un conjunto predefinido de propiedades por evento (por ejemplo, número de ronda, cantidad de jugadores, plataforma, versión de la aplicación, duración de sesión). Los códigos de sala se transforman mediante una función criptográfica de un solo sentido (hash) antes de enviarse, y su nombre de jugador está explícitamente excluido de los parámetros de estos eventos.</p>
+      </section>
+
+      <section class="policy-section" id="es-7">
+        <h2><span class="num">7.</span> Diagnóstico y reportes de errores</h2>
+        <p>Bufón utiliza Firebase Crashlytics para detectar y corregir errores. Los reportes de fallas y diagnóstico pueden incluir tanto información técnica como información contextual, incluyendo:</p>
+        <ul>
+          <li>Versión de la aplicación.</li>
+          <li>Información del dispositivo y del sistema operativo.</li>
+          <li>La pantalla o el contexto en el que ocurrió el evento.</li>
+          <li>El nombre de jugador que usted eligió.</li>
+          <li>El código de la sala.</li>
+          <li>Su identificador anónimo.</li>
+        </ul>
+        <p>Estos reportes pueden, por lo tanto, incluir información contextual además de datos técnicos del dispositivo.</p>
+      </section>
+
+      <section class="policy-section" id="es-8">
+        <h2><span class="num">8.</span> Publicidad</h2>
+        <p>Bufón muestra anuncios recompensados opcionales mediante Google Mobile Ads (AdMob), que puede utilizarse para desbloquear ciertos beneficios dentro del juego. Google puede procesar información del dispositivo y de uso en relación con estos anuncios, conforme a sus propias políticas y a la configuración de privacidad de su dispositivo. No afirmamos que los anuncios mostrados sean necesariamente personalizados ni necesariamente no personalizados; esto depende de la configuración de Google y de su dispositivo.</p>
+        <p>Más información: <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer">Cómo usa Google la información de sitios o aplicaciones que utilizan sus servicios</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Política de Privacidad de Google</a>.</p>
+      </section>
+
+      <section class="policy-section" id="es-9">
+        <h2><span class="num">9.</span> Compras dentro de la aplicación</h2>
+        <p>Las compras dentro de la aplicación se procesan a través de Apple App Store / StoreKit. Nuestros servidores verifican el recibo de la compra y registran la siguiente información para activar su beneficio y prevenir canjes duplicados o fraudulentos: identificador de usuario, código de sala, plataforma, identificador del producto, fecha de compra y fecha de expiración (cuando aplica).</p>
+        <p>Bufón <strong>no</strong> recibe ni almacena los datos de su tarjeta de pago a través de este proceso de compra; estos son manejados directamente por Apple.</p>
+        <p>Más información: <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener noreferrer">Política de Privacidad de Apple</a>.</p>
+      </section>
+
+      <section class="policy-section" id="es-10">
+        <h2><span class="num">10.</span> Seguridad y App Check</h2>
+        <p>Bufón utiliza Firebase App Check para verificar que las solicitudes provienen de una copia genuina y sin modificar de la aplicación. En iOS se utiliza Apple App Attest, con DeviceCheck como alternativa; en Android se utiliza Play Integrity. Este mecanismo sirve para proteger el servicio contra abuso y verificar la integridad de la aplicación y el dispositivo; no se utiliza para identificarlo personalmente ni con fines de analítica.</p>
+      </section>
+
+      <section class="policy-section" id="es-11">
+        <h2><span class="num">11.</span> Compartición de datos y terceros</h2>
+        <p>Bufón comparte información con los siguientes proveedores, en la medida necesaria para operar el servicio:</p>
+        <ul>
+          <li><strong>Google / Firebase:</strong> Authentication, Cloud Firestore, Cloud Functions, Analytics, Crashlytics, App Check y Google Mobile Ads (AdMob).</li>
+          <li><strong>Apple:</strong> App Store / StoreKit para compras, y App Attest / DeviceCheck para verificación de integridad en iOS.</li>
+        </ul>
+        <p>Bufón no vende información personal. No compartimos su información con terceros para que la utilicen con fines de mercadotecnia propios e independientes de la operación de Bufón.</p>
+      </section>
+
+      <section class="policy-section" id="es-12">
+        <h2><span class="num">12.</span> Conservación de datos</h2>
+        <p>Los datos de sala y de jugador dentro de una partida (por ejemplo, respuestas y puntajes de esa partida) son de naturaleza temporal y se eliminan cuando la sala se limpia al finalizar.</p>
+        <p>Los datos de perfil, progreso y tablas de clasificación asociados a su identificador anónimo se conservan mientras dicho identificador permanezca activo, ya que actualmente no existe un mecanismo automático de expiración para esta información.</p>
+        <p>La información de compras puede conservarse durante el tiempo razonablemente necesario para verificar transacciones, otorgar los beneficios adquiridos, prevenir canjes duplicados o fraudulentos, resolver disputas, y cumplir con requisitos legales o contables aplicables. No especificamos un plazo fijo de conservación para esta información.</p>
+      </section>
+
+      <section class="policy-section" id="es-13">
+        <h2><span class="num">13.</span> Solicitudes de eliminación</h2>
+        <div class="card">
+          <p>Puede solicitar la eliminación de los datos de su perfil y de sus tablas de clasificación escribiéndonos a <a href="mailto:jservin19@alumnos.uaq.mx">jservin19@alumnos.uaq.mx</a>.</p>
+          <p>Para ayudarnos a localizar su cuenta, indique el nombre de jugador que utilizó y, si lo recuerda, el código de una sala reciente. Podemos solicitarle información adicional razonablemente necesaria para verificar y localizar su cuenta.</p>
+          <p>Procesamos estas solicitudes de forma manual. Cierta información, incluyendo determinados registros de transacciones, puede necesitar conservarse cuando sea razonablemente necesario para verificación de transacciones, prevención de fraude, resolución de disputas, o por motivos legales, contables o de seguridad.</p>
+        </div>
+        <p>No garantizamos una eliminación inmediata, un plazo fijo en días para completarla, ni la eliminación de absolutamente toda la información en cada sistema de terceros. Actualmente no existe un mecanismo de eliminación automática dentro de la propia aplicación.</p>
+      </section>
+
+      <section class="policy-section" id="es-14">
+        <h2><span class="num">14.</span> Privacidad de menores</h2>
+        <p>Bufón está destinado a personas de 18 años o más. Al utilizar la aplicación, usted declara que tiene al menos 18 años de edad. Bufón no está destinado a menores de 18 años. Si considera que una persona menor de 18 años ha proporcionado información personal a través de Bufón, contáctenos en <a href="mailto:jservin19@alumnos.uaq.mx">jservin19@alumnos.uaq.mx</a> para solicitar su eliminación.</p>
+      </section>
+
+      <section class="policy-section" id="es-15">
+        <h2><span class="num">15.</span> Procesamiento internacional de datos</h2>
+        <p>La infraestructura de Firebase y Google Cloud que utilizamos puede procesar y almacenar información en países distintos al suyo, como es habitual en servicios alojados en la nube.</p>
+      </section>
+
+      <section class="policy-section" id="es-16">
+        <h2><span class="num">16.</span> Cambios a esta política</h2>
+        <p>Podemos actualizar esta Política de Privacidad ocasionalmente. La fecha de «Última actualización» en la parte superior de esta página indica cuándo se realizó la revisión más reciente. Si realizamos cambios importantes a esta Política de Privacidad, actualizaremos la fecha y, cuando corresponda, proporcionaremos información adicional sobre los cambios.</p>
+      </section>
+
+      <section class="policy-section" id="es-17">
+        <h2><span class="num">17.</span> Contacto</h2>
+        <p>Si tiene preguntas sobre esta Política de Privacidad, puede contactar a:</p>
+        <div class="card">
+          <p><strong>Emilio Servín</strong><br />
+          Correo: <a href="mailto:jservin19@alumnos.uaq.mx">jservin19@alumnos.uaq.mx</a></p>
+        </div>
+      </section>
+
+      <a class="back-to-top" href="#es">↑ Volver al inicio de esta sección</a>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- ENGLISH                                                  -->
+  <!-- ======================================================= -->
+  <section class="lang-section" id="en" lang="en">
+    <div class="wrap">
+      <h1>Bufón Privacy Policy</h1>
+      <p>This policy describes what information the Bufón app collects and how it is used. Bufón is a multiplayer party and trivia game.</p>
+      <p><em>Bufón's app interface is currently only available in Spanish. This English section is provided for reference and for App Review purposes.</em></p>
+
+      <nav class="toc" aria-label="Table of contents">
+        <h2>Contents</h2>
+        <ol>
+          <li><a href="#en-1">Introduction</a></li>
+          <li><a href="#en-2">Information We Collect</a></li>
+          <li><a href="#en-3">How We Use Information</a></li>
+          <li><a href="#en-4">Game and Multiplayer Data</a></li>
+          <li><a href="#en-5">Firebase Services</a></li>
+          <li><a href="#en-6">Analytics</a></li>
+          <li><a href="#en-7">Diagnostics and Crash Reporting</a></li>
+          <li><a href="#en-8">Advertising</a></li>
+          <li><a href="#en-9">In-App Purchases</a></li>
+          <li><a href="#en-10">Security and App Check</a></li>
+          <li><a href="#en-11">Data Sharing and Third Parties</a></li>
+          <li><a href="#en-12">Data Retention</a></li>
+          <li><a href="#en-13">Deletion Requests</a></li>
+          <li><a href="#en-14">Children's Privacy</a></li>
+          <li><a href="#en-15">International Data Processing</a></li>
+          <li><a href="#en-16">Changes to This Policy</a></li>
+          <li><a href="#en-17">Contact</a></li>
+        </ol>
+      </nav>
+
+      <section class="policy-section" id="en-1">
+        <h2><span class="num">1.</span> Introduction</h2>
+        <p>Bufón ("we," "our") provides a multiplayer party and trivia game app. This Privacy Policy applies to the Bufón app and accurately describes, based on how it currently works, what information is collected and how it is used.</p>
+        <p>This policy explains how information is collected, used, retained, and shared when you use Bufón.</p>
+      </section>
+
+      <section class="policy-section" id="en-2">
+        <h2><span class="num">2.</span> Information We Collect</h2>
+        <p>Bufón collects the following:</p>
+        <ul>
+          <li>An automatically generated identifier provided by Firebase Authentication for your anonymous Bufón account.</li>
+          <li>The display name (nickname) you choose when creating or joining a room.</li>
+          <li>Your answers during gameplay rounds.</li>
+          <li>Progression statistics: score, experience points (XP), level, games played, wins, votes received, achievements, avatars, and unlocked titles.</li>
+          <li>Basic app and device information (for example, platform, operating-system version, and app version).</li>
+          <li>Crash reports and technical diagnostics.</li>
+          <li>If you make an in-app purchase, verification data for that purchase.</li>
+        </ul>
+        <p>Bufón's own code does <strong>not</strong> collect your real name, an email address as an account field, a phone number, precise location, contacts, photos, camera or microphone access, or an advertising identifier read directly by the app. This does not mean that Google, Firebase, or Apple — as service providers — cannot independently process certain network or device information as a normal part of operating their own infrastructure; see sections 5, 8, and 10.</p>
+      </section>
+
+      <section class="policy-section" id="en-3">
+        <h2><span class="num">3.</span> How We Use Information</h2>
+        <p>We use the information we collect to:</p>
+        <ul>
+          <li>Operate multiplayer rooms and Practice Mode.</li>
+          <li>Track your progression and leaderboard standing.</li>
+          <li>Diagnose crashes and fix bugs.</li>
+          <li>Understand overall usage of app features.</li>
+          <li>Verify in-app purchases.</li>
+          <li>Protect the service against abuse through device-integrity checks.</li>
+        </ul>
+      </section>
+
+      <section class="policy-section" id="en-4">
+        <h2><span class="num">4.</span> Game and Multiplayer Data</h2>
+        <p>Your display name and your answers are visible to other players in the same room for the duration of that game. Your display name and statistics may also appear on public leaderboards, under the nickname you chose.</p>
+        <p>Free-text answers pass through an automated content filter before being stored. This is an automated filter, not human review of every answer.</p>
+      </section>
+
+      <section class="policy-section" id="en-5">
+        <h2><span class="num">5.</span> Firebase Services</h2>
+        <p>Bufón uses Firebase, a set of Google services, for its backend infrastructure: Firebase Authentication (anonymous sign-in), Cloud Firestore (database), and Cloud Functions (server logic). Firebase is operated by Google.</p>
+        <p>As with any online service, Google's infrastructure may automatically process technical connection information (for example, IP address) as a normal part of handling the app's requests.</p>
+        <p>Learn more: <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebase Privacy</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</p>
+      </section>
+
+      <section class="policy-section" id="en-6">
+        <h2><span class="num">6.</span> Analytics</h2>
+        <p>Bufón uses Firebase Analytics to understand how its features are used. Analytics events are associated with your anonymous Firebase identifier, so this analytics is <strong>pseudonymous, not fully anonymous</strong> — the same identifier can link your activity across different app sessions.</p>
+        <p>Only a fixed, predefined set of properties is sent per event (for example, round number, player count, platform, app version, session duration). Room codes are put through a one-way cryptographic hash before being sent, and your display name is explicitly excluded from these event parameters.</p>
+      </section>
+
+      <section class="policy-section" id="en-7">
+        <h2><span class="num">7.</span> Diagnostics and Crash Reporting</h2>
+        <p>Bufón uses Firebase Crashlytics to detect and fix errors. Crash and diagnostic reports may include both technical information and contextual information, including:</p>
+        <ul>
+          <li>App version.</li>
+          <li>Device and operating-system information.</li>
+          <li>The screen or context in which the event occurred.</li>
+          <li>The display name you chose.</li>
+          <li>The room code.</li>
+          <li>Your anonymous identifier.</li>
+        </ul>
+        <p>These reports may therefore include contextual information in addition to technical device data.</p>
+      </section>
+
+      <section class="policy-section" id="en-8">
+        <h2><span class="num">8.</span> Advertising</h2>
+        <p>Bufón shows optional rewarded advertisements through Google Mobile Ads (AdMob), which may be used to unlock certain in-game benefits. Google may process device and usage information in connection with these ads, according to its own policies and your device's privacy settings. We do not claim that ads shown are necessarily personalized, nor that they are necessarily non-personalized; this depends on Google's and your device's settings.</p>
+        <p>Learn more: <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer">How Google uses information from sites or apps that use our services</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</p>
+      </section>
+
+      <section class="policy-section" id="en-9">
+        <h2><span class="num">9.</span> In-App Purchases</h2>
+        <p>In-app purchases are processed through the Apple App Store / StoreKit. Our servers verify the purchase receipt and record the following information to activate your benefit and prevent duplicate or fraudulent redemptions: user identifier, room code, platform, product identifier, purchase date, and expiration date (where applicable).</p>
+        <p>Bufón does <strong>not</strong> receive or store your payment card details through this purchase flow; these are handled directly by Apple.</p>
+        <p>Learn more: <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener noreferrer">Apple Privacy Policy</a>.</p>
+      </section>
+
+      <section class="policy-section" id="en-10">
+        <h2><span class="num">10.</span> Security and App Check</h2>
+        <p>Bufón uses Firebase App Check to verify that requests come from a genuine, unmodified copy of the app. On iOS this uses Apple App Attest, with DeviceCheck as a fallback; on Android it uses Play Integrity. This mechanism protects the service against abuse and verifies app/device integrity; it is not used to identify you personally or for analytics purposes.</p>
+      </section>
+
+      <section class="policy-section" id="en-11">
+        <h2><span class="num">11.</span> Data Sharing and Third Parties</h2>
+        <p>Bufón shares information with the following providers, to the extent necessary to operate the service:</p>
+        <ul>
+          <li><strong>Google / Firebase:</strong> Authentication, Cloud Firestore, Cloud Functions, Analytics, Crashlytics, App Check, and Google Mobile Ads (AdMob).</li>
+          <li><strong>Apple:</strong> App Store / StoreKit for purchases, and App Attest / DeviceCheck for integrity verification on iOS.</li>
+        </ul>
+        <p>Bufón does not sell personal information. We do not share your information with third parties for their own independent marketing purposes.</p>
+      </section>
+
+      <section class="policy-section" id="en-12">
+        <h2><span class="num">12.</span> Data Retention</h2>
+        <p>Room and player data from a single game (for example, that game's answers and scores) is temporary and is deleted when the room is cleaned up.</p>
+        <p>Profile, progression, and leaderboard data associated with your anonymous identifier is retained for as long as that identifier remains active, since there is currently no automatic expiration mechanism for this information.</p>
+        <p>Purchase information may be retained for as long as reasonably necessary to verify transactions, provide purchased benefits, prevent duplicate or fraudulent redemptions, resolve disputes, and comply with applicable legal or accounting requirements. We do not specify a fixed retention period for this information.</p>
+      </section>
+
+      <section class="policy-section" id="en-13">
+        <h2><span class="num">13.</span> Deletion Requests</h2>
+        <div class="card">
+          <p>You may request deletion of your Bufón profile and leaderboard data by contacting us at <a href="mailto:jservin19@alumnos.uaq.mx">jservin19@alumnos.uaq.mx</a>.</p>
+          <p>To help us locate your account, please provide the display name you used and, if available, a recent room code. We may request additional information reasonably necessary to verify and locate your account.</p>
+          <p>We process deletion requests manually. Some information, including certain transaction records, may need to be retained where reasonably necessary for transaction verification, fraud prevention, dispute resolution, or legal, accounting, or security purposes.</p>
+        </div>
+        <p>We do not guarantee immediate deletion, deletion within a fixed number of days, or deletion of every piece of information in every third-party system. There is currently no automatic, in-app deletion mechanism.</p>
+      </section>
+
+      <section class="policy-section" id="en-14">
+        <h2><span class="num">14.</span> Children's Privacy</h2>
+        <p>Bufón is intended for users aged 18 and older. By using the app, you represent that you are at least 18 years old. Bufón is not intended for users under 18. If you believe that a person under 18 has provided personal information through Bufón, please contact us at <a href="mailto:jservin19@alumnos.uaq.mx">jservin19@alumnos.uaq.mx</a> to request its deletion.</p>
+      </section>
+
+      <section class="policy-section" id="en-15">
+        <h2><span class="num">15.</span> International Data Processing</h2>
+        <p>The Firebase and Google Cloud infrastructure we use may process and store information in countries other than your own, as is standard for cloud-hosted services.</p>
+      </section>
+
+      <section class="policy-section" id="en-16">
+        <h2><span class="num">16.</span> Changes to This Policy</h2>
+        <p>We may update this Privacy Policy from time to time. The "Last updated" date at the top of this page reflects when the most recent revision was made. If we make material changes to this Privacy Policy, we will update the date and, where appropriate, provide additional notice about the changes.</p>
+      </section>
+
+      <section class="policy-section" id="en-17">
+        <h2><span class="num">17.</span> Contact</h2>
+        <p>If you have questions about this Privacy Policy, you can contact:</p>
+        <div class="card">
+          <p><strong>Emilio Servín</strong><br />
+          Email: <a href="mailto:jservin19@alumnos.uaq.mx">jservin19@alumnos.uaq.mx</a></p>
+        </div>
+      </section>
+
+      <a class="back-to-top" href="#en">↑ Back to top of this section</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>© 2026 Bufón — Emilio Servín</p>
+</footer>
+
+</body>
+</html>
